@@ -1,68 +1,65 @@
+/* Kanagawa Dual-Theme Definition */
+
+/* Default Theme: Dark (Dragon) */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  --bg-color: #1F1F28;
+  --bg-alt-color: #2A2A37;
+  --fg-color: #DCD7BA;
+  --fg-alt-color: #727169;
+  --accent-primary: #E46876;
+  --accent-secondary: #658594;
+  --accent-yellow: #E6C384;
+  
+  /* High-contrast nodes */
+  --place-node-bg: var(--fg-color);
+  --place-node-border: var(--fg-alt-color);
+  --transition-node-bg: var(--fg-color);
+  --transition-node-border: var(--fg-alt-color);
+  --token-color: var(--bg-color);
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --edge-color: #54546B;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+/* Light Theme Override: (Lotus/Wave) */
+.light-theme {
+  --bg-color: #F2ECBC;
+  --bg-alt-color: #FCF8E8;
+  --fg-color: #54546B;
+  --fg-alt-color: #727169;
+  --accent-primary: #C34043;
+  --accent-secondary: #2D4F67;
+  --accent-yellow: #DCA561;
+
+  /* High-contrast nodes */
+  --place-node-bg: #ffffff;
+  --place-node-border: var(--fg-alt-color);
+  --transition-node-bg: #ffffff;
+  --transition-node-border: var(--fg-alt-color);
+  --token-color: var(--fg-color);
+
+  --edge-color: #727169;
 }
-a:hover {
-  color: #535bf2;
-}
+
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  background-color: var(--bg-color);
+  color: var(--fg-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* Themed styles for React Flow edges */
+.react-flow__edge .themed-edge {
+  stroke: var(--edge-color);
+}
+.react-flow__arrowhead,
+.react-flow__marker {
+  fill: var(--edge-color);
+  stroke: var(--edge-color);
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}
