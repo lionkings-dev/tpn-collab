@@ -1,0 +1,65 @@
+/* Kanagawa Dual-Theme Definition */
+
+/* Default Theme: Dark (Dragon) */
+:root {
+  --bg-color: #1F1F28;
+  --bg-alt-color: #2A2A37;
+  --fg-color: #DCD7BA;
+  --fg-alt-color: #727169;
+  --accent-primary: #E46876;
+  --accent-secondary: #658594;
+  --accent-yellow: #E6C384;
+  
+  /* High-contrast nodes */
+  --place-node-bg: var(--fg-color);
+  --place-node-border: var(--fg-alt-color);
+  --transition-node-bg: var(--fg-color);
+  --transition-node-border: var(--fg-alt-color);
+  --token-color: var(--bg-color);
+
+  --edge-color: #54546B;
+}
+
+/* Light Theme Override: (Lotus/Wave) */
+.light-theme {
+  --bg-color: #F2ECBC;
+  --bg-alt-color: #FCF8E8;
+  --fg-color: #54546B;
+  --fg-alt-color: #727169;
+  --accent-primary: #C34043;
+  --accent-secondary: #2D4F67;
+  --accent-yellow: #DCA561;
+
+  /* High-contrast nodes */
+  --place-node-bg: #ffffff;
+  --place-node-border: var(--fg-alt-color);
+  --transition-node-bg: #ffffff;
+  --transition-node-border: var(--fg-alt-color);
+  --token-color: var(--fg-color);
+
+  --edge-color: #727169;
+}
+
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  background-color: var(--bg-color);
+  color: var(--fg-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Themed styles for React Flow edges */
+.react-flow__edge .themed-edge {
+  stroke: var(--edge-color);
+}
+.react-flow__arrowhead,
+.react-flow__marker {
+  fill: var(--edge-color);
+  stroke: var(--edge-color);
+}
+
