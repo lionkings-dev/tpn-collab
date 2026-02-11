@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 
 import { useFlow } from "../hooks/useFlow";
+import { useYjsProvider } from "../yjs";
 import ThemePanel from "../components/panels/ThemePanel";
 import ActionsPanel from "../components/panels/ActionsPanel";
 import EditorHeader from "../components/panels/EditorHeader";
@@ -18,6 +19,8 @@ import { nodeTypes, edgeTypes } from "../flow-config";
 export default function EditorPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const [colorMode, setColorMode] = useState<ColorMode>("dark");
+
+  const { ydoc } = useYjsProvider(roomId || "default-room");
 
   const {
     nodes,
@@ -31,16 +34,19 @@ export default function EditorPage() {
     clearCanvas,
     addToken,
     onNodeDoubleClick,
-  } = useFlow();
+  } = useFlow(ydoc);
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
+    root.classList.remove("light", "dark");
     root.classList.add(colorMode);
   }, [colorMode]);
 
   return (
-    <div className={`theme-container ${colorMode === 'light' ? 'light-theme' : ''}`} style={{ width: "100vw", height: "100vh" }}>
+    <div
+      className={`theme-container ${colorMode === "light" ? "light-theme" : ""}`}
+      style={{ width: "100vw", height: "100vh" }}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -52,7 +58,7 @@ export default function EditorPage() {
         isValidConnection={isValidConnection}
         onNodeDoubleClick={onNodeDoubleClick}
         defaultEdgeOptions={{
-          className: 'themed-edge',
+          className: "themed-edge",
           markerEnd: { type: MarkerType.ArrowClosed },
         }}
         colorMode={colorMode}

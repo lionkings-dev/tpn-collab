@@ -8,7 +8,9 @@ import {
   type Connection,
 } from "@xyflow/react";
 
-export function useFlow() {
+import * as Y from "yjs";
+
+export function useFlow(ydoc: Y.Doc) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
