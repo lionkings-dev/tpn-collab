@@ -1,38 +1,104 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
+  applyEdgeChanges,
+  applyNodeChanges,
   useNodesState,
   useEdgesState,
   type Node,
   type Edge,
   type Connection,
   type NodeChange,
+  type EdgeChange,
 } from "@xyflow/react";
 
 import * as Y from "yjs";
 
+const POSITION_UPDATE_ORIGIN = "position_origin_ref";
+const POSITION_THROTTLE_MS = 30;
+
+function createId(prefix: string) {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) {
+    return `${prefix}-${uuid}`;
+  }
+
+  const timePart = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  return `${prefix}-${timePart}${randomPart}`;
+}
+
 export function useFlow(ydoc: Y.Doc) {
   const [nodes, setNodes] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [edges, setEdges] = useEdgesState<Edge>([]);
 
   const yNodes = ydoc.getMap<Node>("nodes");
   const yEdges = ydoc.getMap<Edge>("edges");
+  const pendingPositionsRef = useRef<Map<string, { x: number; y: number }>>(
+    new Map(),
+  );
+  const positionFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
+  const flushPendingPositions = useCallback(() => {
+    if (positionFlushTimerRef.current) {
+      clearTimeout(positionFlushTimerRef.current);
+      positionFlushTimerRef.current = null;
+    }
+
+    if (pendingPositionsRef.current.size === 0) return;
+
+    const updates = Array.from(pendingPositionsRef.current.entries());
+    pendingPositionsRef.current.clear();
+
+    ydoc.transact(() => {
+      updates.forEach(([nodeId, position]) => {
+        const yNode = yNodes.get(nodeId);
+        if (!yNode) return;
+
+        const currentX = yNode.position?.x;
+        const currentY = yNode.position?.y;
+        if (currentX === position.x && currentY === position.y) return;
+
+        yNodes.set(nodeId, {
+          ...yNode,
+          position,
+        });
+      });
+    }, POSITION_UPDATE_ORIGIN);
+  }, [ydoc, yNodes]);
 
   //detect yjs change in yNodes and yedges then update react flow locally with setNodes and set edges
   useEffect(() => {
-    const onChange = () => {
+    const onNodesDocChange = (
+      _event: Y.YMapEvent<Node>,
+      transaction: Y.Transaction,
+    ) => {
+      if (transaction.origin === POSITION_UPDATE_ORIGIN) {
+        return;
+      }
       setNodes(Array.from(yNodes.values()) as Node[]);
+    };
+
+    const onEdgesDocChange = () => {
       setEdges(Array.from(yEdges.values()) as Edge[]);
     };
 
-    onChange();
+    setNodes(Array.from(yNodes.values()) as Node[]);
+    onEdgesDocChange();
 
-    yNodes.observe(onChange);
-    yEdges.observe(onChange);
+    yNodes.observe(onNodesDocChange);
+    yEdges.observe(onEdgesDocChange);
 
     return () => {
-      yNodes.unobserve(onChange);
-      yEdges.unobserve(onChange);
+      if (positionFlushTimerRef.current) {
+        clearTimeout(positionFlushTimerRef.current);
+        positionFlushTimerRef.current = null;
+      }
+      pendingPositionsRef.current.clear();
+
+      yNodes.unobserve(onNodesDocChange);
+      yEdges.unobserve(onEdgesDocChange);
     };
   }, [setNodes, setEdges, yNodes, yEdges]);
 
@@ -75,7 +141,7 @@ export function useFlow(ydoc: Y.Doc) {
       if (duplicate) return;
 
       const edge: Edge = {
-        id: `e-${crypto.randomUUID()}`,
+        id: createId("e"),
         source: params.source,
         target: params.target,
         sourceHandle: params.sourceHandle,
@@ -92,31 +158,24 @@ export function useFlow(ydoc: Y.Doc) {
 
   const onNodesChange = useCallback(
     (changes: NodeChange<Node>[]) => {
+      //local update first for smooth UX render
+      setNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
+
+      let shouldFlushImmediately = false;
+
       ydoc.transact(() => {
         changes.forEach((change) => {
           if (change.type === "position") {
             if (!change.position) return;
 
-            const yNode = yNodes.get(change.id);
-            if (!yNode) return;
-
-            const currentX = yNode.position?.x;
-            const currentY = yNode.position?.y;
-
-            if (
-              currentX === change.position.x &&
-              currentY === change.position.y
-            ) {
-              return;
-            }
-
-            yNodes.set(change.id, {
-              ...yNode,
-              position: {
-                x: change.position.x,
-                y: change.position.y,
-              },
+            pendingPositionsRef.current.set(change.id, {
+              x: change.position.x,
+              y: change.position.y,
             });
+
+            if (change.dragging === false) {
+              shouldFlushImmediately = true;
+            }
           }
 
           if (change.type === "remove") {
@@ -129,14 +188,45 @@ export function useFlow(ydoc: Y.Doc) {
           }
         });
       });
+
+      if (shouldFlushImmediately) {
+        flushPendingPositions();
+        return;
+      }
+
+      if (
+        pendingPositionsRef.current.size > 0 &&
+        positionFlushTimerRef.current === null
+      ) {
+        positionFlushTimerRef.current = setTimeout(() => {
+          flushPendingPositions();
+        }, POSITION_THROTTLE_MS);
+      }
     },
-    [ydoc, yNodes, yEdges],
+    [setNodes, ydoc, yNodes, yEdges, flushPendingPositions],
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange<Edge>[]) => {
+      //local update fist
+      setEdges((currentEdges) => applyEdgeChanges(changes, currentEdges));
+
+      ydoc.transact(() => {
+        changes.forEach((change) => {
+          if (change.type === "remove") {
+            yEdges.delete(change.id);
+          }
+        });
+      });
+    },
+    [setEdges, yEdges, ydoc],
   );
 
   const addPlaces = useCallback(() => {
+    const placeLabel = `p${yNodes.size + 1}`;
     const newNode: Node = {
-      id: `p${yNodes.size + 1}`,
-      data: { label: `p${yNodes.size + 1}`, tokens: 0 },
+      id: createId("p"),
+      data: { label: placeLabel, tokens: 0 },
       type: "place",
       position: {
         x: Math.random() * window.innerWidth - 100,
@@ -144,13 +234,13 @@ export function useFlow(ydoc: Y.Doc) {
       },
     };
     yNodes.set(newNode.id, newNode);
-    console.log(yNodes.get(newNode.id));
   }, [yNodes]);
 
   const addTransition = useCallback(() => {
+    const transitionLabel = `t${yEdges.size + 1}`;
     const newNode: Node = {
-      id: `t${Date.now()}`,
-      data: { label: `t${yEdges.size + 1}`, lb: 0, ub: 0, isEditing: false },
+      id: createId("t"),
+      data: { label: transitionLabel, lb: 0, ub: 0, isEditing: false },
       type: "transition",
       position: {
         x: Math.random() * window.innerWidth - 100,
@@ -187,7 +277,7 @@ export function useFlow(ydoc: Y.Doc) {
   }, [nodes, yNodes, ydoc]);
 
   const onNodeDoubleClick = useCallback(
-    (_, node: Node) => {
+    (_event: unknown, node: Node) => {
       setNodes((nds) =>
         nds.map((n) => {
           if (n.id === node.id) {

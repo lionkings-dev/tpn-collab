@@ -6,12 +6,17 @@ export function useYjsProvider(roomId: string) {
   const [connected, setConnected] = useState(false);
 
   const ydoc = useMemo(() => new Y.Doc(), [roomId]);
+  const wsUrl = useMemo(() => {
+    const envUrl = import.meta.env.VITE_WS_URL as string | undefined;
+    if (envUrl) return envUrl;
+    return `ws://${window.location.hostname}:1234`;
+  }, []);
 
   const provider = useMemo(() => {
-    return new WebsocketProvider("ws://localhost:1234", roomId, ydoc, {
+    return new WebsocketProvider(wsUrl, roomId, ydoc, {
       connect: false,
     });
-  }, [roomId, ydoc]);
+  }, [roomId, ydoc, wsUrl]);
 
   useEffect(() => {
     const handleStatus = (event: { status: string }) => {
