@@ -6,8 +6,8 @@ import {
   type ColorMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useState, useEffect, useRef, type PointerEvent } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef, type PointerEvent } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useFlow } from "../hooks/useFlow";
 import { useAwareness, useYjsProvider } from "../yjs";
@@ -15,16 +15,50 @@ import ThemePanel from "../components/panels/ThemePanel";
 import ActionsPanel from "../components/panels/ActionsPanel";
 import EditorHeader from "../components/panels/EditorHeader";
 import { nodeTypes, edgeTypes } from "../flow-config";
+import {
+  checkRoomExists,
+  generateRoomName,
+  isValidRoomId,
+} from "../utils/roomRouting";
 
 const CURSOR_THROTTLE_MS = 40;
+const ROOM_META_PREFIX = "room-meta:";
+
+type RoomRouteState = {
+  roomName?: string;
+};
 
 export default function EditorPage() {
   const { roomId } = useParams<{ roomId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const activeRoomId = roomId || "default-room";
   const [colorMode, setColorMode] = useState<ColorMode>("dark");
+  const [isRoomAllowed, setIsRoomAllowed] = useState(false);
+  const [isCheckingRoom, setIsCheckingRoom] = useState(true);
   const lastCursorUpdateRef = useRef(0);
 
-  const { ydoc, provider } = useYjsProvider(activeRoomId);
+  const routeRoomName = (location.state as RoomRouteState | null)?.roomName;
+  const initialRoomName = useMemo(() => {
+    const stored = localStorage.getItem(`${ROOM_META_PREFIX}${activeRoomId}`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as { name?: string };
+        if (parsed.name && parsed.name.trim()) return parsed.name;
+      } catch {
+        // Ignore malformed local storage
+      }
+    }
+
+    if (routeRoomName && routeRoomName.trim()) {
+      return routeRoomName.trim();
+    }
+
+    return generateRoomName(activeRoomId);
+  }, [activeRoomId, routeRoomName]);
+  const [roomName, setRoomName] = useState(initialRoomName);
+
+  const { ydoc, provider } = useYjsProvider(activeRoomId, isRoomAllowed);
   const { remoteUsers, updateLocalCursor, clearLocalCursor } = useAwareness(
     activeRoomId,
     provider,
@@ -50,6 +84,71 @@ export default function EditorPage() {
     root.classList.add(colorMode);
   }, [colorMode]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const verifyRoom = async () => {
+      if (!roomId || !isValidRoomId(roomId)) {
+        navigate("/", {
+          replace: true,
+          state: { joinError: "Invalid room ID." },
+        });
+        return;
+      }
+
+      setIsCheckingRoom(true);
+
+      try {
+        const exists = await checkRoomExists(roomId);
+        if (cancelled) return;
+
+        if (!exists) {
+          navigate("/", {
+            replace: true,
+            state: {
+              joinError: "Room not found. Create a room from landing page.",
+            },
+          });
+          return;
+        }
+
+        setIsRoomAllowed(true);
+      } catch {
+        if (cancelled) return;
+        navigate("/", {
+          replace: true,
+          state: { joinError: "Could not verify room. Please try again." },
+        });
+      } finally {
+        if (!cancelled) {
+          setIsCheckingRoom(false);
+        }
+      }
+    };
+
+    setIsRoomAllowed(false);
+    void verifyRoom();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, navigate]);
+
+  useEffect(() => {
+    setRoomName(initialRoomName);
+  }, [initialRoomName]);
+
+  const handleSaveRoom = (nextName: string) => {
+    setRoomName(nextName);
+    localStorage.setItem(
+      `${ROOM_META_PREFIX}${activeRoomId}`,
+      JSON.stringify({
+        name: nextName,
+        updatedAt: Date.now(),
+      }),
+    );
+  };
+
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const now = Date.now();
     if (now - lastCursorUpdateRef.current < CURSOR_THROTTLE_MS) return;
@@ -61,6 +160,17 @@ export default function EditorPage() {
   const handlePointerLeave = () => {
     clearLocalCursor();
   };
+
+  if (isCheckingRoom || !isRoomAllowed) {
+    return (
+      <div
+        className={`theme-container ${colorMode === "light" ? "light-theme" : ""}`}
+        style={{ width: "100vw", height: "100vh", display: "grid", placeItems: "center" }}
+      >
+        <p>Validating room...</p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -88,7 +198,11 @@ export default function EditorPage() {
       >
         <Background />
         <Controls />
-        <EditorHeader />
+        <EditorHeader
+          roomId={activeRoomId}
+          roomName={roomName}
+          onSaveRoom={handleSaveRoom}
+        />
         <ThemePanel colorMode={colorMode} setColorMode={setColorMode} />
         <ActionsPanel
           addPlaces={addPlaces}

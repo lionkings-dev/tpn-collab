@@ -42,7 +42,7 @@ function createGuestIdentity() {
   } satisfies AwarenessUser;
 }
 
-export function useYjsProvider(roomId: string) {
+export function useYjsProvider(roomId: string, enabled = true) {
   const [connected, setConnected] = useState(false);
 
   const ydoc = useMemo(() => new Y.Doc(), [roomId]);
@@ -59,6 +59,11 @@ export function useYjsProvider(roomId: string) {
   }, [roomId, ydoc, wsUrl]);
 
   useEffect(() => {
+    if (!enabled) {
+      setConnected(false);
+      return;
+    }
+
     const handleStatus = (event: { status: string }) => {
       console.log(`Yjs Connection Status: ${event.status} RoomID: ${roomId}`);
       setConnected(event.status === "connected");
@@ -73,7 +78,7 @@ export function useYjsProvider(roomId: string) {
       // provider.destroy();
       // ydoc.destroy();
     };
-  }, [provider, ydoc, roomId]);
+  }, [provider, ydoc, roomId, enabled]);
 
   return { ydoc, provider, connected };
 }

@@ -104,6 +104,12 @@
   opacity: 0.9;
 }
 
+.landing-button:disabled,
+.join-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .join-room-section {
   margin-top: 40px;
   display: flex;
@@ -131,6 +137,10 @@
   width: 200px;
 }
 
+.room-id-input.input-error {
+  border-color: #ef4444;
+}
+
 .join-button {
   background: none;
   border: 1px solid var(--fg-alt-color);
@@ -145,4 +155,10 @@
   background-color: var(--accent-secondary);
   border-color: var(--accent-secondary);
   color: var(--bg-alt-color);
+}
+
+.join-error-text {
+  margin: 0;
+  color: #ef4444;
+  font-size: 0.9em;
 }

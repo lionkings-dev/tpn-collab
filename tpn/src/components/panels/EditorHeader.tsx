@@ -2,18 +2,42 @@ import React from "react";
 import { Panel } from "@xyflow/react";
 import "./EditorHeader.css";
 
-// For the mock-up, we can assume the user is anonymous
 type EditorHeaderProps = {
+  roomId: string;
+  roomName: string;
+  onSaveRoom: (nextName: string) => void;
   isAnonymous?: boolean;
 };
 
-const EditorHeader: React.FC<EditorHeaderProps> = ({ isAnonymous = true }) => {
+const EditorHeader: React.FC<EditorHeaderProps> = ({
+  roomId,
+  roomName,
+  onSaveRoom,
+  isAnonymous = true,
+}) => {
   const handleInvite = () => {
-    alert("Invite functionality to be implemented.");
+    const inviteLink = `${window.location.origin}/room/${roomId}`;
+    navigator.clipboard
+      .writeText(inviteLink)
+      .then(() => alert("Invite link copied to clipboard."))
+      .catch(() => alert(`Copy this invite link: ${inviteLink}`));
   };
 
   const handleExport = () => {
     alert("Export functionality to be implemented.");
+  };
+
+  const handleSaveRoom = () => {
+    const input = window.prompt("Save room as", roomName);
+    if (input === null) return;
+
+    const trimmed = input.trim();
+    if (!trimmed) {
+      alert("Room name cannot be empty.");
+      return;
+    }
+
+    onSaveRoom(trimmed);
   };
 
   const handleLogin = () => {
@@ -22,7 +46,9 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({ isAnonymous = true }) => {
 
   return (
     <Panel position="top-left" className="editor-header">
+      <span className="room-name">{roomName}</span>
       <button onClick={handleInvite}>Invite</button>
+      <button onClick={handleSaveRoom}>Save Room</button>
       <button onClick={handleExport}>Export</button>
       {isAnonymous && <button onClick={handleLogin}>Log in to save</button>}
     </Panel>
