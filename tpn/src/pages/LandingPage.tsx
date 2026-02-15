@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./LandingPage.css";
+import ToastPopup, { type ToastType } from "../components/panels/toastPopup";
 import {
   checkRoomExists,
   generateRoomId,
@@ -9,6 +10,12 @@ import {
   normalizeRoomInput,
   registerRoom,
 } from "../utils/roomRouting";
+
+type ToastState = {
+  open: boolean;
+  message: string;
+  type: ToastType;
+};
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -19,6 +26,31 @@ const LandingPage: React.FC = () => {
   const [joinError, setJoinError] = useState(routeJoinError);
   const [isJoining, setIsJoining] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [toast, setToast] = useState<ToastState>({
+    open: false,
+    message: "",
+    type: "info",
+  });
+
+  const showToast = (message: string, type: ToastType = "info") => {
+    setToast({
+      open: true,
+      message,
+      type,
+    });
+  };
+
+  const closeToast = () => {
+    setToast((current) => ({
+      ...current,
+      open: false,
+    }));
+  };
+
+  useEffect(() => {
+    if (!routeJoinError) return;
+    showToast(routeJoinError, "error");
+  }, [routeJoinError]);
 
   const handleCreateModel = async () => {
     setIsCreating(true);
@@ -28,7 +60,9 @@ const LandingPage: React.FC = () => {
     try {
       await registerRoom(roomId);
     } catch {
-      setJoinError("Could not create room right now. Please try again.");
+      const message = "Could not create room right now. Please try again.";
+      setJoinError(message);
+      showToast(message, "error");
       setIsCreating(false);
       return;
     } finally {
@@ -46,17 +80,23 @@ const LandingPage: React.FC = () => {
     const normalizedRoomId = normalizeRoomInput(joinInput);
 
     if (!joinInput.trim()) {
-      setJoinError("Room ID or invite link is required.");
+      const message = "Room ID or invite link is required.";
+      setJoinError(message);
+      showToast(message, "error");
       return;
     }
 
     if (!normalizedRoomId) {
-      setJoinError("Invalid invite link. Use /room/<room-id> format.");
+      const message = "Invalid invite link. Use /room/<room-id> format.";
+      setJoinError(message);
+      showToast(message, "error");
       return;
     }
 
     if (!isValidRoomId(normalizedRoomId)) {
-      setJoinError("Invalid room ID format.");
+      const message = "Invalid room ID format.";
+      setJoinError(message);
+      showToast(message, "error");
       return;
     }
 
@@ -66,13 +106,17 @@ const LandingPage: React.FC = () => {
     try {
       roomExists = await checkRoomExists(normalizedRoomId);
     } catch {
-      setJoinError("Could not verify room right now. Please try again.");
+      const message = "Could not verify room right now. Please try again.";
+      setJoinError(message);
+      showToast(message, "error");
       setIsJoining(false);
       return;
     }
 
     if (!roomExists) {
-      setJoinError("Room not found. Check your room ID or invite link.");
+      const message = "Room not found. Check your room ID or invite link.";
+      setJoinError(message);
+      showToast(message, "error");
       setIsJoining(false);
       return;
     }
@@ -146,10 +190,17 @@ const LandingPage: React.FC = () => {
                 {isJoining ? "Joining..." : "Join Room"}
               </button>
             </div>
-            {joinError && <p className="join-error-text">{joinError}</p>}
           </div>
         </div>
       </main>
+      <ToastPopup
+        open={toast.open}
+        message={toast.message}
+        type={toast.type}
+        durationMs={2600}
+        showCloseButton
+        onClose={closeToast}
+      />
     </div>
   );
 };

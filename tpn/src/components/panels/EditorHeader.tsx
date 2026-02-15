@@ -1,54 +1,44 @@
 import React from "react";
 import { Panel } from "@xyflow/react";
 import "./EditorHeader.css";
+import type { ToastType } from "./toastPopup";
 
 type EditorHeaderProps = {
   roomId: string;
   roomName: string;
-  onSaveRoom: (nextName: string) => void;
+  onOpenSavePrompt: () => void;
+  onNotify: (message: string, type?: ToastType) => void;
   isAnonymous?: boolean;
 };
 
 const EditorHeader: React.FC<EditorHeaderProps> = ({
   roomId,
   roomName,
-  onSaveRoom,
+  onOpenSavePrompt,
+  onNotify,
   isAnonymous = true,
 }) => {
   const handleInvite = () => {
     const inviteLink = `${window.location.origin}/room/${roomId}`;
     navigator.clipboard
       .writeText(inviteLink)
-      .then(() => alert("Invite link copied to clipboard."))
-      .catch(() => alert(`Copy this invite link: ${inviteLink}`));
+      .then(() => onNotify("Invite link copied to clipboard.", "success"))
+      .catch(() => onNotify(`Copy link manually: ${inviteLink}`, "error"));
   };
 
   const handleExport = () => {
-    alert("Export functionality to be implemented.");
-  };
-
-  const handleSaveRoom = () => {
-    const input = window.prompt("Save room as", roomName);
-    if (input === null) return;
-
-    const trimmed = input.trim();
-    if (!trimmed) {
-      alert("Room name cannot be empty.");
-      return;
-    }
-
-    onSaveRoom(trimmed);
+    onNotify("Export functionality to be implemented.", "info");
   };
 
   const handleLogin = () => {
-    alert("Login functionality to be implemented.");
+    onNotify("Login functionality to be implemented.", "info");
   };
 
   return (
     <Panel position="top-left" className="editor-header">
       <span className="room-name">{roomName}</span>
       <button onClick={handleInvite}>Invite</button>
-      <button onClick={handleSaveRoom}>Save Room</button>
+      <button onClick={onOpenSavePrompt}>Save Room</button>
       <button onClick={handleExport}>Export</button>
       {isAnonymous && <button onClick={handleLogin}>Log in to save</button>}
     </Panel>

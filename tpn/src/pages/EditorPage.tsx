@@ -14,6 +14,8 @@ import { useAwareness, useYjsProvider } from "../yjs";
 import ThemePanel from "../components/panels/ThemePanel";
 import ActionsPanel from "../components/panels/ActionsPanel";
 import EditorHeader from "../components/panels/EditorHeader";
+import InputPrompt from "../components/panels/inputPrompt";
+import ToastPopup, { type ToastType } from "../components/panels/toastPopup";
 import { nodeTypes, edgeTypes } from "../flow-config";
 import {
   checkRoomExists,
@@ -28,6 +30,12 @@ type RoomRouteState = {
   roomName?: string;
 };
 
+type ToastState = {
+  open: boolean;
+  message: string;
+  type: ToastType;
+};
+
 export default function EditorPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
@@ -36,6 +44,12 @@ export default function EditorPage() {
   const [colorMode, setColorMode] = useState<ColorMode>("dark");
   const [isRoomAllowed, setIsRoomAllowed] = useState(false);
   const [isCheckingRoom, setIsCheckingRoom] = useState(true);
+  const [toast, setToast] = useState<ToastState>({
+    open: false,
+    message: "",
+    type: "info",
+  });
+  const [isSavePromptOpen, setIsSavePromptOpen] = useState(false);
   const lastCursorUpdateRef = useRef(0);
 
   const routeRoomName = (location.state as RoomRouteState | null)?.roomName;
@@ -149,6 +163,42 @@ export default function EditorPage() {
     );
   };
 
+  const handleNotify = (message: string, type: ToastType = "info") => {
+    setToast({
+      open: true,
+      message,
+      type,
+    });
+  };
+
+  const handleCloseToast = () => {
+    setToast((current) => ({
+      ...current,
+      open: false,
+    }));
+  };
+
+  const handleOpenSavePrompt = () => {
+    setIsSavePromptOpen(true);
+  };
+
+  const handleCloseSavePrompt = () => {
+    setIsSavePromptOpen(false);
+  };
+
+  const validateRoomName = (value: string) => {
+    if (!value.trim()) return "Room name cannot be empty.";
+    if (value.trim().length < 2) return "Room name must be at least 2 characters.";
+    if (value.trim().length > 60) return "Room name must be 60 characters or less.";
+    return null;
+  };
+
+  const handleConfirmSavePrompt = (nextName: string) => {
+    handleSaveRoom(nextName);
+    setIsSavePromptOpen(false);
+    handleNotify("Room name saved.", "success");
+  };
+
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const now = Date.now();
     if (now - lastCursorUpdateRef.current < CURSOR_THROTTLE_MS) return;
@@ -201,7 +251,8 @@ export default function EditorPage() {
         <EditorHeader
           roomId={activeRoomId}
           roomName={roomName}
-          onSaveRoom={handleSaveRoom}
+          onOpenSavePrompt={handleOpenSavePrompt}
+          onNotify={handleNotify}
         />
         <ThemePanel colorMode={colorMode} setColorMode={setColorMode} />
         <ActionsPanel
@@ -259,6 +310,26 @@ export default function EditorPage() {
           );
         })}
       </div>
+      <ToastPopup
+        open={toast.open}
+        message={toast.message}
+        type={toast.type}
+        durationMs={2600}
+        showCloseButton
+        onClose={handleCloseToast}
+      />
+      <InputPrompt
+        open={isSavePromptOpen}
+        title="Save room"
+        description="Set a display name for this room."
+        placeholder="Enter room name"
+        defaultValue={roomName}
+        confirmLabel="Save"
+        cancelLabel="Cancel"
+        validate={validateRoomName}
+        onConfirm={handleConfirmSavePrompt}
+        onCancel={handleCloseSavePrompt}
+      />
     </div>
   );
 }
