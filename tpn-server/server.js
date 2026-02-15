@@ -7,13 +7,24 @@ const port = process.env.PORT || 1234;
 const app = express();
 const ROOM_ID_REGEX = /^[a-z0-9][a-z0-9-]{5,63}$/;
 const knownRooms = new Set();
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim())
+  : [];
 
 function isValidRoomId(roomId) {
   return ROOM_ID_REGEX.test(roomId);
 }
 
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const requestOrigin = req.headers.origin;
+
+  if (corsOrigins.length === 0) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  } else if (requestOrigin && corsOrigins.includes(requestOrigin)) {
+    res.setHeader("Access-Control-Allow-Origin", requestOrigin);
+    res.setHeader("Vary", "Origin");
+  }
+
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 

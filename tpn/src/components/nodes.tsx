@@ -1,7 +1,20 @@
-import { Handle, Position, NodeToolbar } from "@xyflow/react";
+import { Handle, Position } from "@xyflow/react";
+import type { ChangeEvent } from "react";
 import "./nodes.css";
 
-export function PlaceNode({ data }) {
+type PlaceNodeData = {
+  label: string;
+  tokens?: number;
+};
+
+type TransitionNodeData = {
+  lb: number;
+  ub: number;
+  isEditing?: boolean;
+  updateTransitionTime: (nodeId: string, lb: number, ub: number) => void;
+};
+
+export function PlaceNode({ data }: { data: PlaceNodeData }) {
   return (
     <div className="place-node">
       {data.tokens === 1 && <div className="token" />}
@@ -18,15 +31,21 @@ export function PlaceNode({ data }) {
   );
 }
 
-export function TransitionNode({ id, data }) {
-  const onLbChange = (evt: React.ChangeEvent<HTMLInputElement>) => {
+export function TransitionNode({
+  id,
+  data,
+}: {
+  id: string;
+  data: TransitionNodeData;
+}) {
+  const onLbChange = (evt: ChangeEvent<HTMLInputElement>) => {
     const newLb = parseInt(evt.target.value, 10);
     if (!isNaN(newLb)) {
       data.updateTransitionTime(id, newLb, data.ub);
     }
   };
 
-  const onUbChange = (evt: React.ChangeEvent<HTMLInputElement>) => {
+  const onUbChange = (evt: ChangeEvent<HTMLInputElement>) => {
     const newUb = parseInt(evt.target.value, 10);
     if (!isNaN(newUb)) {
       data.updateTransitionTime(id, data.lb, newUb);

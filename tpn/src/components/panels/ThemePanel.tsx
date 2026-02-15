@@ -1,5 +1,5 @@
 import { Panel, type ColorMode } from "@xyflow/react";
-import React, { useState, type ChangeEventHandler } from "react";
+import React, { type ChangeEventHandler } from "react";
 
 type ThemePanelProps = {
   colorMode: ColorMode;
