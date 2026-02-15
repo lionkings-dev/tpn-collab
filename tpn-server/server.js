@@ -7,9 +7,11 @@ const port = process.env.PORT || 1234;
 const app = express();
 const ROOM_ID_REGEX = /^[a-z0-9][a-z0-9-]{5,63}$/;
 const knownRooms = new Set();
-const corsOrigins = process.env.CORS_ORIGIN
+const defaultCorsOrigins = ["http://localhost:5173", "http://127.0.0.1:5173"];
+const corsOrigins = (process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim())
-  : [];
+  : defaultCorsOrigins
+).filter(Boolean);
 
 function isValidRoomId(roomId) {
   return ROOM_ID_REGEX.test(roomId);
@@ -18,9 +20,7 @@ function isValidRoomId(roomId) {
 app.use((req, res, next) => {
   const requestOrigin = req.headers.origin;
 
-  if (corsOrigins.length === 0) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-  } else if (requestOrigin && corsOrigins.includes(requestOrigin)) {
+  if (requestOrigin && corsOrigins.includes(requestOrigin)) {
     res.setHeader("Access-Control-Allow-Origin", requestOrigin);
     res.setHeader("Vary", "Origin");
   }
