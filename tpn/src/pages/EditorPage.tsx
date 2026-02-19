@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo, useRef, type PointerEvent } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useFlow } from "../hooks/useFlow";
-import { useAwareness, useYjsProvider } from "../yjs";
+import { useAwareness, useYjsProvider } from "../features/collaboration";
 import { useAuth } from "../auth/AuthContext";
 import ThemePanel from "../components/panels/ThemePanel";
 import ActionsPanel from "../components/panels/ActionsPanel";
@@ -22,7 +22,7 @@ import {
   checkRoomExists,
   generateRoomName,
   isValidRoomId,
-} from "../utils/roomRouting";
+} from "../features/rooms";
 
 const CURSOR_THROTTLE_MS = 40;
 const ROOM_META_PREFIX = "room-meta:";

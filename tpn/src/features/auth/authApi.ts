@@ -1,4 +1,4 @@
-import { getRoomApiBaseUrl } from "./roomRouting";
+import { getRoomApiBaseUrl } from "../rooms";
 
 export type MeResponseUser = {
   id: string;

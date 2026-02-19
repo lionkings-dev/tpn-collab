@@ -10,7 +10,7 @@ import {
   isValidRoomId,
   normalizeRoomInput,
   registerRoom,
-} from "../utils/roomRouting";
+} from "../features/rooms";
 
 type ToastState = {
   open: boolean;

@@ -19,7 +19,7 @@ import {
   googleAuthProvider,
   isFirebaseClientConfigured,
 } from "../lib/firebase";
-import { fetchMeProfile, type MeResponseUser } from "../utils/apiClient";
+import { fetchMeProfile, type MeResponseUser } from "../features/auth";
 
 type AuthContextValue = {
   user: User | null;
