@@ -30,6 +30,16 @@
 .main-nav {
   display: flex;
   gap: 15px;
+  align-items: center;
+}
+
+.nav-user-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-alt-color);
+  font-size: 0.95em;
 }
 
 .nav-button {
@@ -39,6 +49,11 @@
   font-size: 1em;
   cursor: pointer;
   transition: color 0.3s ease;
+}
+
+.nav-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .nav-button:hover {

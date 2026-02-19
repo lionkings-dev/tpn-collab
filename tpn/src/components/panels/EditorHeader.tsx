@@ -8,7 +8,11 @@ type EditorHeaderProps = {
   roomName: string;
   onOpenSavePrompt: () => void;
   onNotify: (message: string, type?: ToastType) => void;
-  isAnonymous?: boolean;
+  currentUserName: string | null;
+  isAuthenticated: boolean;
+  isAuthLoading: boolean;
+  onLogin: () => void;
+  onLogout: () => void;
 };
 
 const EditorHeader: React.FC<EditorHeaderProps> = ({
@@ -16,22 +20,48 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   roomName,
   onOpenSavePrompt,
   onNotify,
-  isAnonymous = true,
+  currentUserName,
+  isAuthenticated,
+  isAuthLoading,
+  onLogin,
+  onLogout,
 }) => {
   const handleInvite = () => {
     const inviteLink = `${window.location.origin}/room/${roomId}`;
-    navigator.clipboard
-      .writeText(inviteLink)
-      .then(() => onNotify("Invite link copied to clipboard.", "success"))
-      .catch(() => onNotify(`Copy link manually: ${inviteLink}`, "error"));
+
+    const clipboardApi = navigator.clipboard;
+    if (clipboardApi?.writeText) {
+      clipboardApi
+        .writeText(inviteLink)
+        .then(() => onNotify("Invite link copied to clipboard.", "success"))
+        .catch(() => onNotify(`Copy link manually: ${inviteLink}`, "error"));
+      return;
+    }
+
+    const tempInput = document.createElement("textarea");
+    tempInput.value = inviteLink;
+    tempInput.setAttribute("readonly", "");
+    tempInput.style.position = "absolute";
+    tempInput.style.left = "-9999px";
+    document.body.appendChild(tempInput);
+    tempInput.select();
+
+    try {
+      const copied = document.execCommand("copy");
+      if (copied) {
+        onNotify("Invite link copied to clipboard.", "success");
+      } else {
+        onNotify(`Copy link manually: ${inviteLink}`, "error");
+      }
+    } catch {
+      onNotify(`Copy link manually: ${inviteLink}`, "error");
+    } finally {
+      document.body.removeChild(tempInput);
+    }
   };
 
   const handleExport = () => {
     onNotify("Export functionality to be implemented.", "info");
-  };
-
-  const handleLogin = () => {
-    onNotify("Login functionality to be implemented.", "info");
   };
 
   return (
@@ -40,7 +70,20 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
       <button onClick={handleInvite}>Invite</button>
       <button onClick={onOpenSavePrompt}>Save Room</button>
       <button onClick={handleExport}>Export</button>
-      {isAnonymous && <button onClick={handleLogin}>Log in to save</button>}
+      {isAuthenticated ? (
+        <>
+          <span className="editor-auth-name" title={currentUserName || "Authenticated User"}>
+            {currentUserName || "Authenticated User"}
+          </span>
+          <button onClick={onLogout} disabled={isAuthLoading}>
+            {isAuthLoading ? "Signing out..." : "Sign Out"}
+          </button>
+        </>
+      ) : (
+        <button onClick={onLogin} disabled={isAuthLoading}>
+          {isAuthLoading ? "Signing in..." : "Log in with Google"}
+        </button>
+      )}
     </Panel>
   );
 };

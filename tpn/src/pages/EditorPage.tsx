@@ -11,6 +11,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useFlow } from "../hooks/useFlow";
 import { useAwareness, useYjsProvider } from "../yjs";
+import { useAuth } from "../auth/AuthContext";
 import ThemePanel from "../components/panels/ThemePanel";
 import ActionsPanel from "../components/panels/ActionsPanel";
 import EditorHeader from "../components/panels/EditorHeader";
@@ -50,7 +51,19 @@ export default function EditorPage() {
     type: "info",
   });
   const [isSavePromptOpen, setIsSavePromptOpen] = useState(false);
+  const [isAuthActionLoading, setIsAuthActionLoading] = useState(false);
   const lastCursorUpdateRef = useRef(0);
+  const { user, backendUser, isAuthenticated, authLoading, signInWithGoogle, signOutUser } =
+    useAuth();
+  const authDisplayName =
+    backendUser?.displayName || user?.displayName || user?.email || null;
+  const awarenessIdentity = useMemo(() => {
+    if (!authDisplayName) return null;
+    return {
+      id: backendUser?.id || user?.uid || user?.email || authDisplayName,
+      name: authDisplayName,
+    };
+  }, [authDisplayName, backendUser?.id, user?.uid, user?.email]);
 
   const routeRoomName = (location.state as RoomRouteState | null)?.roomName;
   const initialRoomName = useMemo(() => {
@@ -76,6 +89,7 @@ export default function EditorPage() {
   const { remoteUsers, updateLocalCursor, clearLocalCursor } = useAwareness(
     activeRoomId,
     provider,
+    awarenessIdentity,
   );
 
   const {
@@ -199,6 +213,30 @@ export default function EditorPage() {
     handleNotify("Room name saved.", "success");
   };
 
+  const handleAuthLogin = async () => {
+    setIsAuthActionLoading(true);
+    try {
+      await signInWithGoogle();
+      handleNotify("Signed in successfully.", "success");
+    } catch {
+      handleNotify("Google sign-in failed. Please try again.", "error");
+    } finally {
+      setIsAuthActionLoading(false);
+    }
+  };
+
+  const handleAuthLogout = async () => {
+    setIsAuthActionLoading(true);
+    try {
+      await signOutUser();
+      handleNotify("Signed out.", "info");
+    } catch {
+      handleNotify("Sign out failed. Please try again.", "error");
+    } finally {
+      setIsAuthActionLoading(false);
+    }
+  };
+
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const now = Date.now();
     if (now - lastCursorUpdateRef.current < CURSOR_THROTTLE_MS) return;
@@ -253,6 +291,15 @@ export default function EditorPage() {
           roomName={roomName}
           onOpenSavePrompt={handleOpenSavePrompt}
           onNotify={handleNotify}
+          currentUserName={authDisplayName}
+          isAuthenticated={isAuthenticated}
+          isAuthLoading={authLoading || isAuthActionLoading}
+          onLogin={() => {
+            void handleAuthLogin();
+          }}
+          onLogout={() => {
+            void handleAuthLogout();
+          }}
         />
         <ThemePanel colorMode={colorMode} setColorMode={setColorMode} />
         <ActionsPanel

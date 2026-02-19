@@ -84,7 +84,22 @@ export function normalizeRoomInput(input: string): string | null {
 export function getRoomApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_ROOM_API_URL as string | undefined;
   if (envUrl) {
-    return envUrl.replace(/\/$/, "");
+    try {
+      const parsed = new URL(envUrl);
+      const isEnvLocalhost =
+        parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+      const isRuntimeLocalhost =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
+
+      if (isEnvLocalhost && !isRuntimeLocalhost) {
+        parsed.hostname = window.location.hostname;
+      }
+
+      return parsed.toString().replace(/\/$/, "");
+    } catch {
+      return envUrl.replace(/\/$/, "");
+    }
   }
 
   return `http://${window.location.hostname}:1234`;
@@ -103,8 +118,33 @@ export async function checkRoomExists(roomId: string): Promise<boolean> {
   return payload.exists === true;
 }
 
-export async function registerRoom(roomId: string): Promise<void> {
-  await fetch(`${getRoomApiBaseUrl()}/api/rooms/${encodeURIComponent(roomId)}/register`, {
+type RegisterRoomOptions = {
+  idToken?: string;
+  name?: string;
+};
+
+export async function registerRoom(
+  roomId: string,
+  options?: RegisterRoomOptions,
+): Promise<void> {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+
+  if (options?.idToken) {
+    headers.Authorization = `Bearer ${options.idToken}`;
+  }
+
+  const response = await fetch(
+    `${getRoomApiBaseUrl()}/api/rooms/${encodeURIComponent(roomId)}/register`,
+    {
     method: "POST",
-  });
+    headers,
+    body: JSON.stringify({ name: options?.name || "" }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`room_register_failed_${response.status}`);
+  }
 }

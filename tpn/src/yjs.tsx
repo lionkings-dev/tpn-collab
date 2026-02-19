@@ -7,6 +7,11 @@ type AwarenessUser = {
   color: string;
 };
 
+type AwarenessIdentityInput = {
+  id?: string;
+  name?: string;
+};
+
 type AwarenessCursor = {
   x: number;
   y: number;
@@ -42,13 +47,59 @@ function createGuestIdentity() {
   } satisfies AwarenessUser;
 }
 
+function colorFromSeed(seed: string) {
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash << 5) - hash + seed.charCodeAt(index);
+    hash |= 0;
+  }
+
+  const normalized = Math.abs(hash) % AWARENESS_COLORS.length;
+  return AWARENESS_COLORS[normalized];
+}
+
+function createIdentityFromAuth(
+  identity: AwarenessIdentityInput | null | undefined,
+): AwarenessUser | null {
+  const name = identity?.name?.trim();
+  if (!name) return null;
+
+  const seed = (identity?.id || name).toLowerCase();
+  return {
+    name,
+    color: colorFromSeed(seed),
+  };
+}
+
 export function useYjsProvider(roomId: string, enabled = true) {
   const [connected, setConnected] = useState(false);
 
   const ydoc = useMemo(() => new Y.Doc(), [roomId]);
   const wsUrl = useMemo(() => {
     const envUrl = import.meta.env.VITE_WS_URL as string | undefined;
-    if (envUrl) return envUrl;
+    if (envUrl) {
+      try {
+        const parsed = new URL(envUrl);
+        const isEnvLocalhost =
+          parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+        const isRuntimeLocalhost =
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1";
+
+        if (isEnvLocalhost && !isRuntimeLocalhost) {
+          parsed.hostname = window.location.hostname;
+        }
+
+        if (window.location.protocol === "https:" && parsed.protocol === "ws:") {
+          parsed.protocol = "wss:";
+        }
+
+        return parsed.toString();
+      } catch {
+        return envUrl;
+      }
+    }
+
     return `ws://${window.location.hostname}:1234`;
   }, []);
 
@@ -60,6 +111,7 @@ export function useYjsProvider(roomId: string, enabled = true) {
 
   useEffect(() => {
     if (!enabled) {
+      provider.disconnect();
       setConnected(false);
       return;
     }
@@ -69,11 +121,33 @@ export function useYjsProvider(roomId: string, enabled = true) {
       setConnected(event.status === "connected");
     };
 
+    const handleConnectionClose = (event: CloseEvent | null) => {
+      console.log("Yjs connection-close", { roomId, event });
+      setConnected(false);
+    };
+
+    const handleConnectionError = (event: Event | CloseEvent | null) => {
+      console.log("Yjs connection-error", { roomId, event });
+    };
+
+    const reconnectIfVisible = () => {
+      if (document.visibilityState === "hidden") return;
+      provider.connect();
+    };
+
     provider.on("status", handleStatus);
+    provider.on("connection-close", handleConnectionClose);
+    provider.on("connection-error", handleConnectionError);
+    window.addEventListener("pageshow", reconnectIfVisible);
+    document.addEventListener("visibilitychange", reconnectIfVisible);
     provider.connect();
 
     return () => {
       provider.off("status", handleStatus);
+      provider.off("connection-close", handleConnectionClose);
+      provider.off("connection-error", handleConnectionError);
+      window.removeEventListener("pageshow", reconnectIfVisible);
+      document.removeEventListener("visibilitychange", reconnectIfVisible);
       provider.disconnect();
       // provider.destroy();
       // ydoc.destroy();
@@ -83,10 +157,16 @@ export function useYjsProvider(roomId: string, enabled = true) {
   return { ydoc, provider, connected };
 }
 
-export function useAwareness(roomId: string, provider: WebsocketProvider) {
+export function useAwareness(
+  roomId: string,
+  provider: WebsocketProvider,
+  identity?: AwarenessIdentityInput | null,
+) {
   const awareness = provider.awareness;
-  const [localUser] = useState<AwarenessUser>(() => createGuestIdentity());
+  const [guestIdentity] = useState<AwarenessUser>(() => createGuestIdentity());
   const [remoteUsers, setRemoteUsers] = useState<RemoteAwarenessUser[]>([]);
+  const authIdentity = useMemo(() => createIdentityFromAuth(identity), [identity]);
+  const localUser = authIdentity || guestIdentity;
 
   useEffect(() => {
     awareness.setLocalStateField("user", localUser);

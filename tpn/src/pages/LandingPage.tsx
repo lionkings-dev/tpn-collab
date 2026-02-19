@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./LandingPage.css";
 import ToastPopup, { type ToastType } from "../components/panels/toastPopup";
+import { useAuth } from "../auth/AuthContext";
 import {
   checkRoomExists,
   generateRoomId,
@@ -31,6 +32,9 @@ const LandingPage: React.FC = () => {
     message: "",
     type: "info",
   });
+  const { user, backendUser, isAuthenticated, authLoading, signInWithGoogle, signOutUser } =
+    useAuth();
+  const [isAuthActionLoading, setIsAuthActionLoading] = useState(false);
 
   const showToast = (message: string, type: ToastType = "info") => {
     setToast({
@@ -58,7 +62,15 @@ const LandingPage: React.FC = () => {
     const roomName = generateRoomName(roomId);
 
     try {
-      await registerRoom(roomId);
+      let idToken: string | undefined;
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      await registerRoom(roomId, {
+        idToken,
+        name: roomName,
+      });
     } catch {
       const message = "Could not create room right now. Please try again.";
       setJoinError(message);
@@ -140,13 +152,64 @@ const LandingPage: React.FC = () => {
     }
   };
 
+  const handleSignIn = async () => {
+    setIsAuthActionLoading(true);
+    try {
+      await signInWithGoogle();
+      showToast("Signed in successfully.", "success");
+    } catch {
+      showToast("Google sign-in failed. Please try again.", "error");
+    } finally {
+      setIsAuthActionLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setIsAuthActionLoading(true);
+    try {
+      await signOutUser();
+      showToast("Signed out.", "info");
+    } catch {
+      showToast("Sign out failed. Please try again.", "error");
+    } finally {
+      setIsAuthActionLoading(false);
+    }
+  };
+
+  const authName =
+    backendUser?.displayName || user?.displayName || user?.email || "Authenticated User";
+
   return (
     <div className="landing-container">
       <header className="landing-header">
         <div className="logo">TPN-Collab</div>
         <nav className="main-nav">
-          <button className="nav-button login">Login</button>
-          <button className="nav-button signup">Sign Up</button>
+          {isAuthenticated ? (
+            <>
+              <span className="nav-user-name" title={authName}>
+                {authName}
+              </span>
+              <button
+                className="nav-button"
+                onClick={() => {
+                  void handleSignOut();
+                }}
+                disabled={isAuthActionLoading || authLoading}
+              >
+                {isAuthActionLoading ? "Signing out..." : "Sign Out"}
+              </button>
+            </>
+          ) : (
+            <button
+              className="nav-button signup"
+              onClick={() => {
+                void handleSignIn();
+              }}
+              disabled={isAuthActionLoading || authLoading}
+            >
+              {isAuthActionLoading ? "Signing in..." : "Sign In with Google"}
+            </button>
+          )}
         </nav>
       </header>
 
