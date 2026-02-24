@@ -180,6 +180,12 @@ export default function EditorPage() {
       return;
     }
 
+    const claimToken = getRoomClaimToken(activeRoomId);
+    if (!claimToken) {
+      setIsSignInPromptOpen(false);
+      return;
+    }
+
     const dismissKey = `${SIGNIN_PROMPT_DISMISS_PREFIX}${activeRoomId}`;
     const dismissed = localStorage.getItem(dismissKey) === "true";
     if (!dismissed) {

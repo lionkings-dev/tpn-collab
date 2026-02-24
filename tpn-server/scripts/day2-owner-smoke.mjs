@@ -1,0 +1,145 @@
+const baseUrl = (process.env.ROOM_API_URL || "http://localhost:1234").replace(/\/$/, "");
+const authToken = process.env.AUTH_BEARER_TOKEN || "";
+
+function randomSuffix(length = 7) {
+  return Math.random().toString(36).slice(2, 2 + length);
+}
+
+function buildRoomId(prefix) {
+  return `${prefix}-${randomSuffix(8)}`;
+}
+
+async function request(path, options = {}) {
+  const response = await fetch(`${baseUrl}${path}`, options);
+  const text = await response.text();
+  let json = null;
+
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+
+  return { response, json, text };
+}
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+async function run() {
+  const checks = [];
+  const push = (name, ok, details = "") => {
+    checks.push({ name, ok, details });
+    console.log(`[${ok ? "PASS" : "FAIL"}] ${name}${details ? ` - ${details}` : ""}`);
+  };
+
+  let failed = false;
+
+  try {
+    const health = await request("/");
+    assert(health.response.ok, "Health endpoint failed");
+    push("Health endpoint", true, `status=${health.response.status}`);
+
+    const roomId = buildRoomId("qa-day2-owner");
+    const register = await request(`/api/rooms/${encodeURIComponent(roomId)}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "QA Day2 Owner Flow" }),
+    });
+    assert(register.response.status === 201, "Room register should return 201");
+    assert(register.json?.ok === true, "Room register should return ok=true");
+    assert(typeof register.json?.claimToken === "string", "Register should return claimToken");
+    const claimToken = register.json.claimToken;
+    push("Anonymous register returns claim token", true, `roomId=${roomId}`);
+
+    const mineUnauth = await request("/api/rooms/mine");
+    assert(mineUnauth.response.status === 401, "GET /mine without token should return 401");
+    push("Owned rooms requires auth", true, "401 without bearer");
+
+    const claimUnauth = await request(`/api/rooms/${encodeURIComponent(roomId)}/claim`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claimToken }),
+    });
+    assert(claimUnauth.response.status === 401, "Claim without token should return 401");
+    push("Claim endpoint requires auth", true, "401 without bearer");
+
+    if (!authToken) {
+      push(
+        "Authenticated owner branch",
+        true,
+        "skipped (set AUTH_BEARER_TOKEN to enable)",
+      );
+    } else {
+      const authHeaders = {
+        Authorization: `Bearer ${authToken}`,
+        "Content-Type": "application/json",
+      };
+
+      const claim = await request(`/api/rooms/${encodeURIComponent(roomId)}/claim`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ claimToken }),
+      });
+      assert(claim.response.ok, "Claim with valid token should succeed");
+      assert(claim.json?.ok === true, "Claim should return ok=true");
+      assert(
+        claim.json?.claimStatus === "claimed" || claim.json?.claimStatus === "already_owned_by_you",
+        "Claim status should be claimed or already_owned_by_you",
+      );
+      push("Claim room ownership", true, `status=${claim.json.claimStatus}`);
+
+      const mine = await request("/api/rooms/mine", { headers: authHeaders });
+      assert(mine.response.ok, "GET /mine with token should succeed");
+      const ownedRooms = Array.isArray(mine.json?.rooms) ? mine.json.rooms : [];
+      assert(ownedRooms.some((room) => room.roomId === roomId), "Owned room list should include room");
+      push("Owned rooms list includes claimed room", true, `roomId=${roomId}`);
+
+      const renamed = await request(`/api/rooms/${encodeURIComponent(roomId)}`, {
+        method: "PATCH",
+        headers: authHeaders,
+        body: JSON.stringify({ name: "QA Day2 Renamed" }),
+      });
+      assert(renamed.response.ok, "PATCH rename should succeed for owner");
+      assert(renamed.json?.room?.name === "QA Day2 Renamed", "Rename response should return updated name");
+      push("Owner can rename room", true, "PATCH /api/rooms/:roomId");
+
+      const archived = await request(`/api/rooms/${encodeURIComponent(roomId)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      assert(archived.response.ok, "DELETE archive should succeed for owner");
+      push("Owner can archive room", true, "DELETE /api/rooms/:roomId");
+
+      const existsAfterArchive = await request(`/api/rooms/${encodeURIComponent(roomId)}/exists`);
+      assert(existsAfterArchive.response.ok, "Exists check after archive should succeed");
+      assert(
+        existsAfterArchive.json?.exists === false,
+        "Archived room should not appear as existing in strict guard",
+      );
+      push("Archived room hidden from exists", true, `roomId=${roomId}`);
+    }
+  } catch (error) {
+    failed = true;
+    push("Day2 owner smoke", false, error instanceof Error ? error.message : "unknown error");
+  }
+
+  const passedCount = checks.filter((check) => check.ok).length;
+  const failedCount = checks.length - passedCount;
+
+  console.log("\nSummary");
+  console.log(`- Base URL: ${baseUrl}`);
+  console.log(`- Passed: ${passedCount}`);
+  console.log(`- Failed: ${failedCount}`);
+
+  if (failed || failedCount > 0) {
+    process.exitCode = 1;
+  }
+}
+
+await run();
