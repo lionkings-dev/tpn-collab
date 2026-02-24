@@ -68,7 +68,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
     <Panel position="top-left" className="editor-header">
       <span className="room-name">{roomName}</span>
       <button onClick={handleInvite}>Invite</button>
-      <button onClick={onOpenSavePrompt}>Save Room</button>
+      <button onClick={onOpenSavePrompt}>Rename Room</button>
       <button onClick={handleExport}>Export</button>
       {isAuthenticated ? (
         <>

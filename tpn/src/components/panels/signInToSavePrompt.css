@@ -1,0 +1,48 @@
+.signin-save-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+}
+
+.signin-save-card {
+  width: min(520px, calc(100vw - 2rem));
+  background: var(--bg-alt-color);
+  border: 1px solid var(--fg-alt-color);
+  border-radius: 10px;
+  padding: 1rem;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+}
+
+.signin-save-title {
+  margin: 0 0 0.4rem;
+}
+
+.signin-save-description {
+  margin: 0;
+  color: var(--fg-alt-color);
+}
+
+.signin-save-actions {
+  margin-top: 0.9rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.signin-save-btn {
+  border: 1px solid var(--accent-secondary);
+  background: var(--accent-secondary);
+  color: var(--bg-color);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+}
+
+.signin-save-btn.ghost {
+  border-color: var(--fg-alt-color);
+  background: transparent;
+  color: var(--fg-color);
+}

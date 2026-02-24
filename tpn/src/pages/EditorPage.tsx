@@ -12,20 +12,27 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useFlow } from "../hooks/useFlow";
 import { useAwareness, useYjsProvider } from "../features/collaboration";
 import { useAuth } from "../auth/AuthContext";
+import { firebaseAuth } from "../lib/firebase";
 import ThemePanel from "../components/panels/ThemePanel";
 import ActionsPanel from "../components/panels/ActionsPanel";
 import EditorHeader from "../components/panels/EditorHeader";
 import InputPrompt from "../components/panels/inputPrompt";
+import SignInToSavePrompt from "../components/panels/signInToSavePrompt";
 import ToastPopup, { type ToastType } from "../components/panels/toastPopup";
 import { nodeTypes, edgeTypes } from "../flow-config";
 import {
   checkRoomExists,
+  claimRoomOwnership,
+  clearRoomClaimToken,
+  getRoomClaimToken,
   generateRoomName,
   isValidRoomId,
+  renameOwnedRoom,
 } from "../features/rooms";
 
 const CURSOR_THROTTLE_MS = 40;
 const ROOM_META_PREFIX = "room-meta:";
+const SIGNIN_PROMPT_DISMISS_PREFIX = "room-signin-prompt-dismissed:";
 
 type RoomRouteState = {
   roomName?: string;
@@ -51,6 +58,7 @@ export default function EditorPage() {
     type: "info",
   });
   const [isSavePromptOpen, setIsSavePromptOpen] = useState(false);
+  const [isSignInPromptOpen, setIsSignInPromptOpen] = useState(false);
   const [isAuthActionLoading, setIsAuthActionLoading] = useState(false);
   const lastCursorUpdateRef = useRef(0);
   const { user, backendUser, isAuthenticated, authLoading, signInWithGoogle, signOutUser } =
@@ -166,8 +174,32 @@ export default function EditorPage() {
     setRoomName(initialRoomName);
   }, [initialRoomName]);
 
-  const handleSaveRoom = (nextName: string) => {
+  useEffect(() => {
+    if (!isRoomAllowed || isCheckingRoom || isAuthenticated) {
+      setIsSignInPromptOpen(false);
+      return;
+    }
+
+    const dismissKey = `${SIGNIN_PROMPT_DISMISS_PREFIX}${activeRoomId}`;
+    const dismissed = localStorage.getItem(dismissKey) === "true";
+    if (!dismissed) {
+      setIsSignInPromptOpen(true);
+    }
+  }, [activeRoomId, isAuthenticated, isCheckingRoom, isRoomAllowed]);
+
+  const handleRenameRoom = async (nextName: string) => {
     setRoomName(nextName);
+
+    const currentUser = firebaseAuth.currentUser;
+    if (currentUser) {
+      try {
+        const idToken = await currentUser.getIdToken();
+        await renameOwnedRoom(activeRoomId, nextName, idToken);
+      } catch {
+        // Fallback remains local-only for non-owner/guest flows.
+      }
+    }
+
     localStorage.setItem(
       `${ROOM_META_PREFIX}${activeRoomId}`,
       JSON.stringify({
@@ -200,6 +232,11 @@ export default function EditorPage() {
     setIsSavePromptOpen(false);
   };
 
+  const handleDismissSignInPrompt = () => {
+    localStorage.setItem(`${SIGNIN_PROMPT_DISMISS_PREFIX}${activeRoomId}`, "true");
+    setIsSignInPromptOpen(false);
+  };
+
   const validateRoomName = (value: string) => {
     if (!value.trim()) return "Room name cannot be empty.";
     if (value.trim().length < 2) return "Room name must be at least 2 characters.";
@@ -208,15 +245,49 @@ export default function EditorPage() {
   };
 
   const handleConfirmSavePrompt = (nextName: string) => {
-    handleSaveRoom(nextName);
-    setIsSavePromptOpen(false);
-    handleNotify("Room name saved.", "success");
+    void handleRenameRoom(nextName).finally(() => {
+      setIsSavePromptOpen(false);
+      handleNotify("Room renamed.", "success");
+    });
+  };
+
+  const tryClaimRoomOwnership = async () => {
+    const signedInUser = firebaseAuth.currentUser;
+    if (!signedInUser) return;
+
+    const claimToken = getRoomClaimToken(activeRoomId);
+    if (!claimToken) return;
+
+    const idToken = await signedInUser.getIdToken();
+
+    try {
+      const result = await claimRoomOwnership(activeRoomId, idToken, claimToken);
+      clearRoomClaimToken(activeRoomId);
+
+      if (result.claimStatus === "claimed") {
+        handleNotify("Room linked to your account.", "success");
+      }
+    } catch (error) {
+      if (!(error instanceof Error)) return;
+
+      if (error.message === "room_already_claimed") {
+        clearRoomClaimToken(activeRoomId);
+        handleNotify("This room is already owned by another account.", "info");
+        return;
+      }
+
+      if (error.message === "claim_token_invalid_or_missing") {
+        handleNotify("Ownership key is missing or invalid on this device.", "info");
+      }
+    }
   };
 
   const handleAuthLogin = async () => {
     setIsAuthActionLoading(true);
     try {
       await signInWithGoogle();
+      await tryClaimRoomOwnership();
+      setIsSignInPromptOpen(false);
       handleNotify("Signed in successfully.", "success");
     } catch {
       handleNotify("Google sign-in failed. Please try again.", "error");
@@ -367,15 +438,22 @@ export default function EditorPage() {
       />
       <InputPrompt
         open={isSavePromptOpen}
-        title="Save room"
+        title="Rename room"
         description="Set a display name for this room."
         placeholder="Enter room name"
         defaultValue={roomName}
-        confirmLabel="Save"
+        confirmLabel="Rename"
         cancelLabel="Cancel"
         validate={validateRoomName}
         onConfirm={handleConfirmSavePrompt}
         onCancel={handleCloseSavePrompt}
+      />
+      <SignInToSavePrompt
+        open={isSignInPromptOpen}
+        onClose={handleDismissSignInPrompt}
+        onSignIn={() => {
+          void handleAuthLogin();
+        }}
       />
     </div>
   );

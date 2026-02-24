@@ -5,8 +5,10 @@ import ToastPopup, { type ToastType } from "../components/panels/toastPopup";
 import { useAuth } from "../auth/AuthContext";
 import {
   checkRoomExists,
+  clearRoomClaimToken,
   generateRoomId,
   generateRoomName,
+  saveRoomClaimToken,
   isValidRoomId,
   normalizeRoomInput,
   registerRoom,
@@ -67,9 +69,23 @@ const LandingPage: React.FC = () => {
         idToken = await user.getIdToken();
       }
 
-      await registerRoom(roomId, {
+      const createdRoom = await registerRoom(roomId, {
         idToken,
         name: roomName,
+      });
+
+      if (createdRoom.claimToken) {
+        saveRoomClaimToken(roomId, createdRoom.claimToken);
+      }
+
+      if (!createdRoom.claimToken) {
+        clearRoomClaimToken(roomId);
+      }
+
+      navigate(`/room/${roomId}`, {
+        state: {
+          roomName,
+        },
       });
     } catch {
       const message = "Could not create room right now. Please try again.";
@@ -80,12 +96,6 @@ const LandingPage: React.FC = () => {
     } finally {
       setIsCreating(false);
     }
-
-    navigate(`/room/${roomId}`, {
-      state: {
-        roomName,
-      },
-    });
   };
 
   const handleJoinRoom = async () => {
@@ -189,6 +199,14 @@ const LandingPage: React.FC = () => {
               <span className="nav-user-name" title={authName}>
                 {authName}
               </span>
+              <button
+                className="nav-button"
+                onClick={() => {
+                  navigate("/rooms");
+                }}
+              >
+                My Rooms
+              </button>
               <button
                 className="nav-button"
                 onClick={() => {
