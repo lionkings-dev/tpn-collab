@@ -32,6 +32,19 @@ export async function getMongoDb() {
   return mongoDb;
 }
 
+export async function getMongoClient() {
+  if (!mongoClient) {
+    mongoClient = new MongoClient(getMongoUri());
+    await mongoClient.connect();
+  }
+
+  return mongoClient;
+}
+
+export function getMongoDatabaseName() {
+  return getMongoDbName();
+}
+
 export async function getCollection(name) {
   const db = await getMongoDb();
   return db.collection(name);

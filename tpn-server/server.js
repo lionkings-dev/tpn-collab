@@ -4,6 +4,7 @@ import express from "express";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 
+import { initializeYjsPersistence } from "./collab/yjsPersistence.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { initializeRoomsStorage } from "./rooms/roomsRepo.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -34,6 +35,7 @@ wss.on("connection", (ws, req) => {
 
 async function startServer() {
   try {
+    await initializeYjsPersistence();
     await initializeRoomsStorage();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown startup error";
