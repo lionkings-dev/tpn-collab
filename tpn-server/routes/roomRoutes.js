@@ -5,6 +5,7 @@ import { requireAuth } from "../auth/requireAuth.js";
 import {
   archiveOwnedRoom,
   claimRoomOwnership,
+  getRoomById,
   getOwnedRooms,
   registerRoom,
   renameOwnedRoom,
@@ -151,6 +152,34 @@ roomRoutes.get("/mine", requireAuth, async (req, res) => {
     }
 
     res.status(500).json({ ok: false, error: "owned_rooms_load_failed" });
+  }
+});
+
+roomRoutes.get("/:roomId", async (req, res) => {
+  const roomId = normalizeRoomId(req.params.roomId);
+
+  if (!roomId || !isValidRoomId(roomId)) {
+    res.status(400).json({ ok: false, error: "invalid_room_id" });
+    return;
+  }
+
+  try {
+    const room = await getRoomById(roomId);
+    res.json({ ok: true, room });
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? error.code : null;
+    if (code === "room_not_found") {
+      res.status(404).json({ ok: false, error: code });
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : "Room load failed.";
+    if (message.includes("MONGODB_URI is required")) {
+      res.status(503).json({ ok: false, error: "db_not_configured" });
+      return;
+    }
+
+    res.status(500).json({ ok: false, error: "room_load_failed" });
   }
 });
 

@@ -11,6 +11,7 @@ export type { RegisterRoomOptions } from "./roomApi";
 export {
   claimRoomOwnership,
   deleteOwnedRoom,
+  getRoomById,
   getOwnedRooms,
   renameOwnedRoom,
 } from "./roomApi";

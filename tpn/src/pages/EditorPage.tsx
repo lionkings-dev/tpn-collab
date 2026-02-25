@@ -24,6 +24,7 @@ import {
   checkRoomExists,
   claimRoomOwnership,
   clearRoomClaimToken,
+  getRoomById,
   getRoomClaimToken,
   generateRoomName,
   isValidRoomId,
@@ -146,6 +147,22 @@ export default function EditorPage() {
             },
           });
           return;
+        }
+
+        try {
+          const room = await getRoomById(roomId);
+          if (cancelled) return;
+
+          setRoomName(room.name);
+          localStorage.setItem(
+            `${ROOM_META_PREFIX}${roomId}`,
+            JSON.stringify({
+              name: room.name,
+              updatedAt: Date.now(),
+            }),
+          );
+        } catch {
+          if (cancelled) return;
         }
 
         setIsRoomAllowed(true);

@@ -92,6 +92,20 @@ export async function roomExists(roomId) {
   return Boolean(room);
 }
 
+export async function getRoomById(roomId) {
+  const rooms = await getRoomsCollection();
+  const room = await rooms.findOne({
+    _id: roomId,
+    status: { $ne: "archived" },
+  });
+
+  if (!room) {
+    throw buildError("room_not_found");
+  }
+
+  return normalizeRoomDoc(room);
+}
+
 export async function registerRoom({ roomId, roomName, ownerId }) {
   const rooms = await getRoomsCollection();
   const now = new Date();

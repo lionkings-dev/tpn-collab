@@ -28,6 +28,23 @@ export type ClaimRoomResult = {
   claimStatus: "claimed" | "already_owned_by_you";
 };
 
+export async function getRoomById(roomId: string): Promise<OwnedRoom> {
+  const response = await fetch(`${getRoomApiBaseUrl()}/api/rooms/${encodeURIComponent(roomId)}`, {
+    method: "GET",
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | { ok?: boolean; room?: OwnedRoom; error?: string }
+    | null;
+
+  if (!response.ok || !payload?.ok || !payload.room) {
+    const errorCode = payload?.error || `room_load_failed_${response.status}`;
+    throw new Error(errorCode);
+  }
+
+  return payload.room;
+}
+
 export function getRoomApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_ROOM_API_URL as string | undefined;
   return resolveApiBaseUrl(envUrl);
