@@ -18,26 +18,38 @@
   --token-color: var(--bg-color);
 
   --edge-color: #54546B;
+  --node-selected-border: #22d3ee;
+  --node-selected-ring: rgba(34, 211, 238, 0.75);
+  --node-selected-glow: rgba(34, 211, 238, 0.35);
+  --node-selected-token-ring: rgba(34, 211, 238, 0.5);
 }
 
 /* Light Theme Override: (Lotus/Wave) */
 .light-theme {
-  --bg-color: #F2ECBC;
-  --bg-alt-color: #FCF8E8;
-  --fg-color: #54546B;
-  --fg-alt-color: #727169;
+  --bg-color: #f8f9fb;
+  --bg-alt-color: #ffffff;
+  --fg-color: #111111;
+  --fg-alt-color: #4a4a4a;
   --accent-primary: #C34043;
   --accent-secondary: #2D4F67;
   --accent-yellow: #DCA561;
 
-  /* High-contrast nodes */
+  /* Light mode clarity */
   --place-node-bg: #ffffff;
-  --place-node-border: var(--fg-alt-color);
+  --place-node-border: #111111;
   --transition-node-bg: #ffffff;
-  --transition-node-border: var(--fg-alt-color);
+  --transition-node-border: #111111;
   --token-color: var(--fg-color);
 
-  --edge-color: #727169;
+  --edge-color: #2f2f2f;
+  --node-selected-border: #111111;
+  --node-selected-ring: rgba(17, 17, 17, 0.6);
+  --node-selected-glow: rgba(17, 17, 17, 0.15);
+  --node-selected-token-ring: rgba(17, 17, 17, 0.4);
+}
+
+.light-theme .react-flow__background path {
+  stroke: #d7dbe1;
 }
 
 
@@ -52,14 +64,3 @@ body {
   color: var(--fg-color);
   transition: background-color 0.3s ease, color 0.3s ease;
 }
-
-/* Themed styles for React Flow edges */
-.react-flow__edge .themed-edge {
-  stroke: var(--edge-color);
-}
-.react-flow__arrowhead,
-.react-flow__marker {
-  fill: var(--edge-color);
-  stroke: var(--edge-color);
-}
-

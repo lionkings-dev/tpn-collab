@@ -116,12 +116,6 @@ export default function EditorPage() {
   } = useFlow(ydoc);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(colorMode);
-  }, [colorMode]);
-
-  useEffect(() => {
     let cancelled = false;
 
     const verifyRoom = async () => {
@@ -346,7 +340,7 @@ export default function EditorPage() {
   if (isCheckingRoom || !isRoomAllowed) {
     return (
       <div
-        className={`theme-container ${colorMode === "light" ? "light-theme" : ""}`}
+        className="editor-page"
         style={{ width: "100vw", height: "100vh", display: "grid", placeItems: "center" }}
       >
         <p>Validating room...</p>
@@ -356,7 +350,7 @@ export default function EditorPage() {
 
   return (
     <div
-      className={`theme-container ${colorMode === "light" ? "light-theme" : ""}`}
+      className="editor-page"
       style={{ width: "100vw", height: "100vh", position: "relative" }}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
@@ -372,10 +366,10 @@ export default function EditorPage() {
         isValidConnection={isValidConnection}
         onNodeDoubleClick={onNodeDoubleClick}
         defaultEdgeOptions={{
-          className: "themed-edge",
           markerEnd: { type: MarkerType.ArrowClosed },
         }}
         colorMode={colorMode}
+        style={{ background: "#ffffff" }}
         fitView
       >
         <Background />
