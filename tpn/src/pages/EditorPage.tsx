@@ -3,70 +3,77 @@ import {
   Background,
   Controls,
   MarkerType,
-  type Viewport,
   type ColorMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useState, useEffect, useMemo, useRef, type PointerEvent } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useFlow } from "../hooks/useFlow";
 import { useAwareness, useYjsProvider } from "../features/collaboration";
+import { useToastState } from "../features/editor/hooks/useToastState";
+import { useCursorLayer } from "../features/editor/hooks/useCursorLayer";
+import { useEditorRoomAccess } from "../features/editor/hooks/useEditorRoomAccess";
+import { useEditorAuthActions } from "../features/editor/hooks/useEditorAuthActions";
+import RemoteCursorsLayer from "../features/editor/components/RemoteCursorsLayer";
 import { useAuth } from "../auth/AuthContext";
-import { firebaseAuth } from "../lib/firebase";
 import ThemePanel from "../components/panels/ThemePanel";
 import ActionsPanel from "../components/panels/ActionsPanel";
 import EditorHeader from "../components/panels/EditorHeader";
 import InputPrompt from "../components/panels/inputPrompt";
 import SignInToSavePrompt from "../components/panels/signInToSavePrompt";
-import ToastPopup, { type ToastType } from "../components/panels/toastPopup";
+import ToastPopup from "../components/panels/toastPopup";
 import { nodeTypes, edgeTypes } from "../flow-config";
-import {
-  checkRoomExists,
-  claimRoomOwnership,
-  clearRoomClaimToken,
-  getRoomById,
-  getRoomClaimToken,
-  generateRoomName,
-  isValidRoomId,
-  renameOwnedRoom,
-} from "../features/rooms";
-
-const CURSOR_THROTTLE_MS = 40;
-const ROOM_META_PREFIX = "room-meta:";
-const SIGNIN_PROMPT_DISMISS_PREFIX = "room-signin-prompt-dismissed:";
 
 type RoomRouteState = {
   roomName?: string;
 };
 
-type ToastState = {
-  open: boolean;
-  message: string;
-  type: ToastType;
-};
+const FULL_SCREEN_EDITOR_STYLE = {
+  width: "100vw",
+  height: "100vh",
+  position: "relative",
+} as const;
+
+const FULL_SCREEN_CENTER_STYLE = {
+  width: "100vw",
+  height: "100vh",
+  display: "grid",
+  placeItems: "center",
+} as const;
+
+function validateRoomName(value: string) {
+  if (!value.trim()) return "Room name cannot be empty.";
+  if (value.trim().length < 2)
+    return "Room name must be at least 2 characters.";
+  if (value.trim().length > 60)
+    return "Room name must be 60 characters or less.";
+  return null;
+}
 
 export default function EditorPage() {
+  // Routing + page-level UI state.
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const activeRoomId = roomId || "default-room";
   const [colorMode, setColorMode] = useState<ColorMode>("dark");
-  const [isRoomAllowed, setIsRoomAllowed] = useState(false);
-  const [isCheckingRoom, setIsCheckingRoom] = useState(true);
-  const [toast, setToast] = useState<ToastState>({
-    open: false,
-    message: "",
-    type: "info",
-  });
+
+  // Cross-cutting UI feedback state.
+  const { toast, notify, closeToast } = useToastState();
   const [isSavePromptOpen, setIsSavePromptOpen] = useState(false);
-  const [isSignInPromptOpen, setIsSignInPromptOpen] = useState(false);
-  const [isAuthActionLoading, setIsAuthActionLoading] = useState(false);
-  const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
-  const lastCursorUpdateRef = useRef(0);
+
+  // Root editor element used for pointer-to-canvas projection.
   const editorRef = useRef<HTMLDivElement | null>(null);
-  const { user, backendUser, isAuthenticated, authLoading, signInWithGoogle, signOutUser } =
-    useAuth();
+
+  // Auth session and identity used in header and awareness labels.
+  const {
+    user,
+    backendUser,
+    isAuthenticated,
+    authLoading,
+    signInWithGoogle,
+    signOutUser,
+  } = useAuth();
   const authDisplayName =
     backendUser?.displayName || user?.displayName || user?.email || null;
   const awarenessIdentity = useMemo(() => {
@@ -78,32 +85,65 @@ export default function EditorPage() {
   }, [authDisplayName, backendUser?.id, user?.uid, user?.email]);
 
   const routeRoomName = (location.state as RoomRouteState | null)?.roomName;
-  const initialRoomName = useMemo(() => {
-    const stored = localStorage.getItem(`${ROOM_META_PREFIX}${activeRoomId}`);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as { name?: string };
-        if (parsed.name && parsed.name.trim()) return parsed.name;
-      } catch {
-        // Ignore malformed local storage
-      }
-    }
+  const handleJoinErrorRedirect = useCallback(
+    (message: string) => {
+      navigate("/", {
+        replace: true,
+        state: { joinError: message },
+      });
+    },
+    [navigate],
+  );
 
-    if (routeRoomName && routeRoomName.trim()) {
-      return routeRoomName.trim();
-    }
+  // Room guard + metadata hydration + rename behavior.
+  const { activeRoomId, roomName, isRoomAllowed, isCheckingRoom, renameRoom } =
+    useEditorRoomAccess({
+      roomId,
+      routeRoomName,
+      onJoinErrorRedirect: handleJoinErrorRedirect,
+    });
 
-    return generateRoomName(activeRoomId);
-  }, [activeRoomId, routeRoomName]);
-  const [roomName, setRoomName] = useState(initialRoomName);
-
+  // Yjs document/provider lifecycle for the active room.
   const { ydoc, provider } = useYjsProvider(activeRoomId, isRoomAllowed);
+
+  // Awareness channel for remote cursors and user presence identity.
   const { remoteUsers, updateLocalCursor, clearLocalCursor } = useAwareness(
     activeRoomId,
     provider,
     awarenessIdentity,
   );
 
+  // Sign-in prompt + ownership-claim actions for guest-created rooms.
+  const {
+    isSignInPromptOpen,
+    isAuthActionLoading,
+    dismissSignInPrompt,
+    login,
+    logout,
+  } = useEditorAuthActions({
+    activeRoomId,
+    isRoomAllowed,
+    isCheckingRoom,
+    isAuthenticated,
+    signInWithGoogle,
+    signOutUser,
+    notify,
+  });
+
+  // Pointer capture and cursor projection between screen-space and flow-space.
+  const {
+    handleViewportChange,
+    onPointerMove,
+    onPointerLeave,
+    resolveRemoteCursorPosition,
+    isRemoteCursorVisible,
+  } = useCursorLayer({
+    editorRef,
+    updateLocalCursor,
+    clearLocalCursor,
+  });
+
+  // React Flow state/actions synchronized to Yjs maps.
   const {
     nodes,
     edges,
@@ -118,299 +158,47 @@ export default function EditorPage() {
     onNodeDoubleClick,
   } = useFlow(ydoc);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const verifyRoom = async () => {
-      if (!roomId || !isValidRoomId(roomId)) {
-        navigate("/", {
-          replace: true,
-          state: { joinError: "Invalid room ID." },
-        });
-        return;
-      }
-
-      setIsCheckingRoom(true);
-
-      try {
-        const exists = await checkRoomExists(roomId);
-        if (cancelled) return;
-
-        if (!exists) {
-          navigate("/", {
-            replace: true,
-            state: {
-              joinError: "Room not found. Create a room from landing page.",
-            },
-          });
-          return;
-        }
-
-        try {
-          const room = await getRoomById(roomId);
-          if (cancelled) return;
-
-          setRoomName(room.name);
-          localStorage.setItem(
-            `${ROOM_META_PREFIX}${roomId}`,
-            JSON.stringify({
-              name: room.name,
-              updatedAt: Date.now(),
-            }),
-          );
-        } catch {
-          if (cancelled) return;
-        }
-
-        setIsRoomAllowed(true);
-      } catch {
-        if (cancelled) return;
-        navigate("/", {
-          replace: true,
-          state: { joinError: "Could not verify room. Please try again." },
-        });
-      } finally {
-        if (!cancelled) {
-          setIsCheckingRoom(false);
-        }
-      }
-    };
-
-    setIsRoomAllowed(false);
-    void verifyRoom();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [roomId, navigate]);
-
-  useEffect(() => {
-    setRoomName(initialRoomName);
-  }, [initialRoomName]);
-
-  useEffect(() => {
-    if (!isRoomAllowed || isCheckingRoom || isAuthenticated) {
-      setIsSignInPromptOpen(false);
-      return;
-    }
-
-    const claimToken = getRoomClaimToken(activeRoomId);
-    if (!claimToken) {
-      setIsSignInPromptOpen(false);
-      return;
-    }
-
-    const dismissKey = `${SIGNIN_PROMPT_DISMISS_PREFIX}${activeRoomId}`;
-    const dismissed = localStorage.getItem(dismissKey) === "true";
-    if (!dismissed) {
-      setIsSignInPromptOpen(true);
-    }
-  }, [activeRoomId, isAuthenticated, isCheckingRoom, isRoomAllowed]);
-
-  const handleRenameRoom = async (nextName: string) => {
-    setRoomName(nextName);
-
-    const currentUser = firebaseAuth.currentUser;
-    if (currentUser) {
-      try {
-        const idToken = await currentUser.getIdToken();
-        await renameOwnedRoom(activeRoomId, nextName, idToken);
-      } catch {
-        // Fallback remains local-only for non-owner/guest flows.
-      }
-    }
-
-    localStorage.setItem(
-      `${ROOM_META_PREFIX}${activeRoomId}`,
-      JSON.stringify({
-        name: nextName,
-        updatedAt: Date.now(),
-      }),
-    );
-  };
-
-  const handleNotify = (message: string, type: ToastType = "info") => {
-    setToast({
-      open: true,
-      message,
-      type,
-    });
-  };
-
-  const handleCloseToast = () => {
-    setToast((current) => ({
-      ...current,
-      open: false,
-    }));
-  };
-
-  const handleOpenSavePrompt = () => {
+  const handleOpenSavePrompt = useCallback(() => {
     setIsSavePromptOpen(true);
-  };
+  }, []);
 
-  const handleCloseSavePrompt = () => {
+  const handleCloseSavePrompt = useCallback(() => {
     setIsSavePromptOpen(false);
-  };
+  }, []);
 
-  const handleDismissSignInPrompt = () => {
-    localStorage.setItem(`${SIGNIN_PROMPT_DISMISS_PREFIX}${activeRoomId}`, "true");
-    setIsSignInPromptOpen(false);
-  };
+  const handleConfirmRenamePrompt = useCallback(
+    (nextName: string) => {
+      void renameRoom(nextName).finally(() => {
+        setIsSavePromptOpen(false);
+        notify("Room renamed.", "success");
+      });
+    },
+    [notify, renameRoom],
+  );
 
-  const validateRoomName = (value: string) => {
-    if (!value.trim()) return "Room name cannot be empty.";
-    if (value.trim().length < 2) return "Room name must be at least 2 characters.";
-    if (value.trim().length > 60) return "Room name must be 60 characters or less.";
-    return null;
-  };
+  const handleLogin = useCallback(() => {
+    void login();
+  }, [login]);
 
-  const handleConfirmSavePrompt = (nextName: string) => {
-    void handleRenameRoom(nextName).finally(() => {
-      setIsSavePromptOpen(false);
-      handleNotify("Room renamed.", "success");
-    });
-  };
-
-  const tryClaimRoomOwnership = async () => {
-    const signedInUser = firebaseAuth.currentUser;
-    if (!signedInUser) return;
-
-    const claimToken = getRoomClaimToken(activeRoomId);
-    if (!claimToken) return;
-
-    const idToken = await signedInUser.getIdToken();
-
-    try {
-      const result = await claimRoomOwnership(activeRoomId, idToken, claimToken);
-      clearRoomClaimToken(activeRoomId);
-
-      if (result.claimStatus === "claimed") {
-        handleNotify("Room linked to your account.", "success");
-      }
-    } catch (error) {
-      if (!(error instanceof Error)) return;
-
-      if (error.message === "room_already_claimed") {
-        clearRoomClaimToken(activeRoomId);
-        handleNotify("This room is already owned by another account.", "info");
-        return;
-      }
-
-      if (error.message === "claim_token_invalid_or_missing") {
-        handleNotify("Ownership key is missing or invalid on this device.", "info");
-      }
-    }
-  };
-
-  const handleAuthLogin = async () => {
-    setIsAuthActionLoading(true);
-    try {
-      await signInWithGoogle();
-      await tryClaimRoomOwnership();
-      setIsSignInPromptOpen(false);
-      handleNotify("Signed in successfully.", "success");
-    } catch {
-      handleNotify("Google sign-in failed. Please try again.", "error");
-    } finally {
-      setIsAuthActionLoading(false);
-    }
-  };
-
-  const handleAuthLogout = async () => {
-    setIsAuthActionLoading(true);
-    try {
-      await signOutUser();
-      handleNotify("Signed out.", "info");
-    } catch {
-      handleNotify("Sign out failed. Please try again.", "error");
-    } finally {
-      setIsAuthActionLoading(false);
-    }
-  };
-
-  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    const now = Date.now();
-    if (now - lastCursorUpdateRef.current < CURSOR_THROTTLE_MS) return;
-
-    const editorElement = editorRef.current;
-    if (!editorElement) return;
-
-    const rect = editorElement.getBoundingClientRect();
-    const localX = event.clientX - rect.left;
-    const localY = event.clientY - rect.top;
-    const flowX = (localX - viewport.x) / viewport.zoom;
-    const flowY = (localY - viewport.y) / viewport.zoom;
-
-    lastCursorUpdateRef.current = now;
-    updateLocalCursor(flowX, flowY);
-  };
-
-  const handlePointerLeave = () => {
-    clearLocalCursor();
-  };
-
-  const resolveRemoteCursorPosition = (cursor?: {
-    flowX?: number;
-    flowY?: number;
-    x?: number;
-    y?: number;
-  }) => {
-    if (!cursor) return null;
-
-    if (typeof cursor.flowX === "number" && typeof cursor.flowY === "number") {
-      return {
-        x: cursor.flowX * viewport.zoom + viewport.x,
-        y: cursor.flowY * viewport.zoom + viewport.y,
-      };
-    }
-
-    if (typeof cursor.x === "number" && typeof cursor.y === "number") {
-      const rect = editorRef.current?.getBoundingClientRect();
-      if (!rect) {
-        return { x: cursor.x, y: cursor.y };
-      }
-
-      return {
-        x: cursor.x - rect.left,
-        y: cursor.y - rect.top,
-      };
-    }
-
-    return null;
-  };
-
-  const isRemoteCursorVisible = (position: { x: number; y: number }) => {
-    const rect = editorRef.current?.getBoundingClientRect();
-    if (!rect) return true;
-
-    const visibilityPadding = 24;
-
-    return (
-      position.x >= -visibilityPadding &&
-      position.x <= rect.width + visibilityPadding &&
-      position.y >= -visibilityPadding &&
-      position.y <= rect.height + visibilityPadding
-    );
-  };
+  const handleLogout = useCallback(() => {
+    void logout();
+  }, [logout]);
 
   if (isCheckingRoom || !isRoomAllowed) {
     return (
-      <div
-        className="editor-page"
-        style={{ width: "100vw", height: "100vh", display: "grid", placeItems: "center" }}
-      >
+      <div className="editor-page" style={FULL_SCREEN_CENTER_STYLE}>
         <p>Validating room...</p>
       </div>
     );
   }
-
+  // Render gated editor only after strict room validation succeeds.
   return (
     <div
       ref={editorRef}
       className="editor-page"
-      style={{ width: "100vw", height: "100vh", position: "relative" }}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
+      style={FULL_SCREEN_EDITOR_STYLE}
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
     >
       <ReactFlow
         nodes={nodes}
@@ -428,7 +216,7 @@ export default function EditorPage() {
         colorMode={colorMode}
         style={{ background: "#ffffff" }}
         onMove={(_event, nextViewport) => {
-          setViewport(nextViewport);
+          handleViewportChange(nextViewport);
         }}
         fitView
       >
@@ -438,16 +226,12 @@ export default function EditorPage() {
           roomId={activeRoomId}
           roomName={roomName}
           onOpenSavePrompt={handleOpenSavePrompt}
-          onNotify={handleNotify}
+          onNotify={notify}
           currentUserName={authDisplayName}
           isAuthenticated={isAuthenticated}
           isAuthLoading={authLoading || isAuthActionLoading}
-          onLogin={() => {
-            void handleAuthLogin();
-          }}
-          onLogout={() => {
-            void handleAuthLogout();
-          }}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
         />
         <ThemePanel colorMode={colorMode} setColorMode={setColorMode} />
         <ActionsPanel
@@ -457,63 +241,18 @@ export default function EditorPage() {
           addToken={addToken}
         />
       </ReactFlow>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 20,
-        }}
-      >
-        {remoteUsers.map((remoteUser) => {
-          const position = resolveRemoteCursorPosition(remoteUser.cursor);
-          if (!position) return null;
-          if (!isRemoteCursorVisible(position)) return null;
-
-          return (
-            <div
-              key={remoteUser.clientId}
-              style={{
-                position: "absolute",
-                transform: `translate(${position.x}px, ${position.y}px)`,
-                display: "flex",
-                alignItems: "center",
-                gap: "0.35rem",
-              }}
-            >
-              <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 999,
-                  backgroundColor: remoteUser.user.color,
-                  boxShadow: "0 0 0 2px rgba(0, 0, 0, 0.35)",
-                }}
-              />
-              <span
-                style={{
-                  padding: "0.1rem 0.4rem",
-                  borderRadius: 6,
-                  background: "rgba(10, 10, 10, 0.8)",
-                  color: "#fff",
-                  fontSize: 12,
-                  lineHeight: 1.2,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {remoteUser.user.name}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <RemoteCursorsLayer
+        remoteUsers={remoteUsers}
+        resolveRemoteCursorPosition={resolveRemoteCursorPosition}
+        isRemoteCursorVisible={isRemoteCursorVisible}
+      />
       <ToastPopup
         open={toast.open}
         message={toast.message}
         type={toast.type}
         durationMs={2600}
         showCloseButton
-        onClose={handleCloseToast}
+        onClose={closeToast}
       />
       <InputPrompt
         open={isSavePromptOpen}
@@ -524,15 +263,13 @@ export default function EditorPage() {
         confirmLabel="Rename"
         cancelLabel="Cancel"
         validate={validateRoomName}
-        onConfirm={handleConfirmSavePrompt}
+        onConfirm={handleConfirmRenamePrompt}
         onCancel={handleCloseSavePrompt}
       />
       <SignInToSavePrompt
         open={isSignInPromptOpen}
-        onClose={handleDismissSignInPrompt}
-        onSignIn={() => {
-          void handleAuthLogin();
-        }}
+        onClose={dismissSignInPrompt}
+        onSignIn={handleLogin}
       />
     </div>
   );
