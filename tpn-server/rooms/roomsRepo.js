@@ -320,6 +320,63 @@ export async function archiveOwnedRoom({ roomId, ownerId }) {
   throw buildError("room_archive_failed");
 }
 
+export async function findIdleOwnerlessActiveRooms({
+  idleBefore,
+  limit = 500,
+} = {}) {
+  if (!(idleBefore instanceof Date) || Number.isNaN(idleBefore.getTime())) {
+    throw buildError("invalid_idle_before");
+  }
+
+  const rooms = await getRoomsCollection();
+  const result = await rooms
+    .find(
+      {
+        status: "active",
+        ownerId: null,
+        lastAccessedAt: { $lte: idleBefore },
+      },
+      {
+        sort: { lastAccessedAt: 1 },
+        limit,
+      },
+    )
+    .toArray();
+
+  return result.map((roomDoc) => normalizeRoomDoc(roomDoc));
+}
+
+export async function archiveOwnerlessRoomsByIds(roomIds) {
+  if (!Array.isArray(roomIds) || roomIds.length === 0) {
+    return {
+      matchedCount: 0,
+      modifiedCount: 0,
+    };
+  }
+
+  const rooms = await getRoomsCollection();
+  const now = new Date();
+
+  const result = await rooms.updateMany(
+    {
+      _id: { $in: roomIds },
+      status: "active",
+      ownerId: null,
+    },
+    {
+      $set: {
+        status: "archived",
+        updatedAt: now,
+      },
+    },
+  );
+
+  return {
+    matchedCount: result.matchedCount,
+    modifiedCount: result.modifiedCount,
+  };
+}
+
 export async function initializeRoomsStorage() {
   const rooms = await getCollection("rooms");
   await ensureRoomsIndexes(rooms);
