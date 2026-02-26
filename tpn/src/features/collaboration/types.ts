@@ -9,8 +9,10 @@ export type AwarenessIdentityInput = {
 };
 
 export type AwarenessCursor = {
-  x: number;
-  y: number;
+  flowX?: number;
+  flowY?: number;
+  x?: number;
+  y?: number;
 };
 
 export type AwarenessState = {

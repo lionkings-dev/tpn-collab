@@ -94,8 +94,17 @@ export function useAwareness(
     };
   }, [awareness, roomId, localUser]);
 
-  const updateLocalCursor = (x: number, y: number) => {
-    awareness.setLocalStateField("cursor", { x, y } satisfies AwarenessCursor);
+  const updateLocalCursor = (flowX: number, flowY: number) => {
+    awareness.setLocalStateField(
+      "cursor",
+      {
+        flowX,
+        flowY,
+        // Transitional compatibility for clients still reading screen-space fields.
+        x: flowX,
+        y: flowY,
+      } satisfies AwarenessCursor,
+    );
   };
 
   const clearLocalCursor = () => {

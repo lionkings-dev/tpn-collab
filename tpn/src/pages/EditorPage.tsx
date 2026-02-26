@@ -3,6 +3,7 @@ import {
   Background,
   Controls,
   MarkerType,
+  type Viewport,
   type ColorMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -61,7 +62,9 @@ export default function EditorPage() {
   const [isSavePromptOpen, setIsSavePromptOpen] = useState(false);
   const [isSignInPromptOpen, setIsSignInPromptOpen] = useState(false);
   const [isAuthActionLoading, setIsAuthActionLoading] = useState(false);
+  const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
   const lastCursorUpdateRef = useRef(0);
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const { user, backendUser, isAuthenticated, authLoading, signInWithGoogle, signOutUser } =
     useAuth();
   const authDisplayName =
@@ -329,12 +332,65 @@ export default function EditorPage() {
     const now = Date.now();
     if (now - lastCursorUpdateRef.current < CURSOR_THROTTLE_MS) return;
 
+    const editorElement = editorRef.current;
+    if (!editorElement) return;
+
+    const rect = editorElement.getBoundingClientRect();
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    const flowX = (localX - viewport.x) / viewport.zoom;
+    const flowY = (localY - viewport.y) / viewport.zoom;
+
     lastCursorUpdateRef.current = now;
-    updateLocalCursor(event.clientX, event.clientY);
+    updateLocalCursor(flowX, flowY);
   };
 
   const handlePointerLeave = () => {
     clearLocalCursor();
+  };
+
+  const resolveRemoteCursorPosition = (cursor?: {
+    flowX?: number;
+    flowY?: number;
+    x?: number;
+    y?: number;
+  }) => {
+    if (!cursor) return null;
+
+    if (typeof cursor.flowX === "number" && typeof cursor.flowY === "number") {
+      return {
+        x: cursor.flowX * viewport.zoom + viewport.x,
+        y: cursor.flowY * viewport.zoom + viewport.y,
+      };
+    }
+
+    if (typeof cursor.x === "number" && typeof cursor.y === "number") {
+      const rect = editorRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return { x: cursor.x, y: cursor.y };
+      }
+
+      return {
+        x: cursor.x - rect.left,
+        y: cursor.y - rect.top,
+      };
+    }
+
+    return null;
+  };
+
+  const isRemoteCursorVisible = (position: { x: number; y: number }) => {
+    const rect = editorRef.current?.getBoundingClientRect();
+    if (!rect) return true;
+
+    const visibilityPadding = 24;
+
+    return (
+      position.x >= -visibilityPadding &&
+      position.x <= rect.width + visibilityPadding &&
+      position.y >= -visibilityPadding &&
+      position.y <= rect.height + visibilityPadding
+    );
   };
 
   if (isCheckingRoom || !isRoomAllowed) {
@@ -350,6 +406,7 @@ export default function EditorPage() {
 
   return (
     <div
+      ref={editorRef}
       className="editor-page"
       style={{ width: "100vw", height: "100vh", position: "relative" }}
       onPointerMove={handlePointerMove}
@@ -370,6 +427,9 @@ export default function EditorPage() {
         }}
         colorMode={colorMode}
         style={{ background: "#ffffff" }}
+        onMove={(_event, nextViewport) => {
+          setViewport(nextViewport);
+        }}
         fitView
       >
         <Background />
@@ -406,14 +466,16 @@ export default function EditorPage() {
         }}
       >
         {remoteUsers.map((remoteUser) => {
-          if (!remoteUser.cursor) return null;
+          const position = resolveRemoteCursorPosition(remoteUser.cursor);
+          if (!position) return null;
+          if (!isRemoteCursorVisible(position)) return null;
 
           return (
             <div
               key={remoteUser.clientId}
               style={{
                 position: "absolute",
-                transform: `translate(${remoteUser.cursor.x}px, ${remoteUser.cursor.y}px)`,
+                transform: `translate(${position.x}px, ${position.y}px)`,
                 display: "flex",
                 alignItems: "center",
                 gap: "0.35rem",
