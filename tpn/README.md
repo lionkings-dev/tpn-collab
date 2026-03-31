@@ -71,3 +71,18 @@ export default defineConfig([
   },
 ])
 ```
+
+## PNML Formatting Script
+
+Use this helper to pretty-format exported PNML files for docs and demos:
+
+```bash
+npm run pnml:format -- ./example.pnml
+```
+
+PNML downloaded from the app export button is already formatted. This script is useful when you want to reformat external PNML files.
+
+Optional flags:
+
+- `--out <path>` writes to a separate output file.
+- `--stdout` prints formatted XML to standard output.

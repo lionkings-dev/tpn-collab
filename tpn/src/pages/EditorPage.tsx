@@ -11,6 +11,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useFlow } from "../hooks/useFlow";
 import { useAwareness, useYjsProvider } from "../features/collaboration";
+import { exportPnml, importPnml } from "../features/export";
 import { useToastState } from "../features/editor/hooks/useToastState";
 import { useCursorLayer } from "../features/editor/hooks/useCursorLayer";
 import { useEditorRoomAccess } from "../features/editor/hooks/useEditorRoomAccess";
@@ -49,6 +50,12 @@ function validateRoomName(value: string) {
   if (value.trim().length > 60)
     return "Room name must be 60 characters or less.";
   return null;
+}
+
+function toDownloadFileName(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+  const cleaned = normalized.replace(/-{2,}/g, "-").replace(/^-|-$/g, "");
+  return cleaned ? `${cleaned}.pnml` : "tpn-room.pnml";
 }
 
 export default function EditorPage() {
@@ -154,6 +161,7 @@ export default function EditorPage() {
     addPlaces,
     addTransition,
     clearCanvas,
+    replaceGraph,
     addToken,
     onNodeDoubleClick,
   } = useFlow(ydoc);
@@ -183,6 +191,51 @@ export default function EditorPage() {
   const handleLogout = useCallback(() => {
     void logout();
   }, [logout]);
+
+  const handleExportPnml = useCallback(() => {
+    try {
+      const pnml = exportPnml({
+        roomId: activeRoomId,
+        roomName,
+        nodes,
+        edges,
+      });
+
+      const fileName = toDownloadFileName(roomName || activeRoomId);
+      const blob = new Blob([pnml], {
+        type: "application/xml;charset=utf-8",
+      });
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(objectUrl);
+
+      notify("PNML exported successfully.", "success");
+    } catch {
+      notify("Export failed. Please verify your graph before retrying.", "error");
+    }
+  }, [activeRoomId, roomName, nodes, edges, notify]);
+
+  const handleImportPnml = useCallback(
+    async (file: File) => {
+      try {
+        const content = await file.text();
+        const importedGraph = importPnml(content);
+        replaceGraph(importedGraph.nodes, importedGraph.edges);
+        notify(
+          `PNML imported: ${importedGraph.nodes.length} nodes, ${importedGraph.edges.length} arcs.`,
+          "success",
+        );
+      } catch {
+        notify("Import failed. Please upload a valid PNML file.", "error");
+      }
+    },
+    [notify, replaceGraph],
+  );
 
   if (isCheckingRoom || !isRoomAllowed) {
     return (
@@ -227,6 +280,8 @@ export default function EditorPage() {
           roomName={roomName}
           onOpenSavePrompt={handleOpenSavePrompt}
           onNotify={notify}
+          onExport={handleExportPnml}
+          onImportFile={handleImportPnml}
           currentUserName={authDisplayName}
           isAuthenticated={isAuthenticated}
           isAuthLoading={authLoading || isAuthActionLoading}

@@ -70,6 +70,8 @@ export function useFlow(ydoc: Y.Doc) {
 
   //detect yjs change in yNodes and yedges then update react flow locally with setNodes and set edges
   useEffect(() => {
+    const pendingPositions = pendingPositionsRef.current;
+
     const onNodesDocChange = (
       _event: Y.YMapEvent<Node>,
       transaction: Y.Transaction,
@@ -95,7 +97,7 @@ export function useFlow(ydoc: Y.Doc) {
         clearTimeout(positionFlushTimerRef.current);
         positionFlushTimerRef.current = null;
       }
-      pendingPositionsRef.current.clear();
+      pendingPositions.clear();
 
       yNodes.unobserve(onNodesDocChange);
       yEdges.unobserve(onEdgesDocChange);
@@ -255,6 +257,26 @@ export function useFlow(ydoc: Y.Doc) {
     yEdges.clear();
   }, [yNodes, yEdges]);
 
+  const replaceGraph = useCallback(
+    (nextNodes: Node[], nextEdges: Edge[]) => {
+      flushPendingPositions();
+
+      ydoc.transact(() => {
+        yNodes.clear();
+        yEdges.clear();
+
+        nextNodes.forEach((node) => {
+          yNodes.set(node.id, node);
+        });
+
+        nextEdges.forEach((edge) => {
+          yEdges.set(edge.id, edge);
+        });
+      });
+    },
+    [flushPendingPositions, ydoc, yNodes, yEdges],
+  );
+
   const addToken = useCallback(() => {
     ydoc.transact(() => {
       nodes.forEach((node) => {
@@ -350,6 +372,7 @@ export function useFlow(ydoc: Y.Doc) {
     addPlaces,
     addTransition,
     clearCanvas,
+    replaceGraph,
     addToken,
     onNodeDoubleClick,
     updateTransitionTime,
