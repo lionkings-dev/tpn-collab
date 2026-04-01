@@ -6,10 +6,14 @@ import { WebSocketServer } from "ws";
 
 import { initializeYjsPersistence } from "./collab/yjsPersistence.js";
 import { corsMiddleware } from "./middleware/cors.js";
-import { initializeRoomsStorage } from "./rooms/roomsRepo.js";
+import {
+  initializeRoomsStorage,
+  roomExists,
+} from "./rooms/roomsRepo.js";
 import authRoutes from "./routes/authRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js";
+import { isValidRoomId, normalizeRoomId } from "./utils/roomId.js";
 
 const port = process.env.PORT || 1234;
 const app = express();
@@ -22,15 +26,58 @@ app.use("/api", authRoutes);
 app.use("/api/rooms", roomRoutes);
 
 const server = createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer: true });
 
-wss.on("connection", (ws, req) => {
-  setupWSConnection(ws, req);
-  console.log("WS Connection Established");
+function rejectUpgrade(socket, statusCode, reason) {
+  socket.write(
+    `HTTP/1.1 ${statusCode} ${reason}\r\nConnection: close\r\nContent-Type: text/plain\r\n\r\n${reason}`,
+  );
+  socket.destroy();
+}
 
-  ws.on("close", () => {
-    console.log("WS Connection Closed");
-  });
+function resolveRoomIdFromUpgradeUrl(rawUrl) {
+  const parsed = new URL(rawUrl || "/", "http://localhost");
+  const pathSegments = parsed.pathname.split("/").filter(Boolean);
+  const roomSegment = pathSegments.at(-1) || "";
+  const roomId = normalizeRoomId(roomSegment);
+  return {
+    roomId,
+    search: parsed.search,
+  };
+}
+
+server.on("upgrade", async (req, socket, head) => {
+  const { roomId, search } = resolveRoomIdFromUpgradeUrl(req.url);
+
+  if (!roomId || !isValidRoomId(roomId)) {
+    rejectUpgrade(socket, 400, "invalid_room_id");
+    return;
+  }
+
+  try {
+    const exists = await roomExists(roomId);
+    if (!exists) {
+      rejectUpgrade(socket, 404, "room_not_found");
+      return;
+    }
+
+    req.url = `/${roomId}${search}`;
+
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      setupWSConnection(ws, req);
+      console.log("WS Connection Established", { roomId });
+
+      ws.on("close", () => {
+        console.log("WS Connection Closed", { roomId });
+      });
+    });
+  } catch (error) {
+    console.error("WebSocket room admission failed", {
+      roomId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    rejectUpgrade(socket, 503, "room_admission_failed");
+  }
 });
 
 async function startServer() {

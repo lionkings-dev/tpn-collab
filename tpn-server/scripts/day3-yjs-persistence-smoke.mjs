@@ -8,6 +8,7 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 
 const baseUrl = (process.env.ROOM_API_URL || "http://localhost:1234").replace(/\/$/, "");
+const authToken = process.env.AUTH_BEARER_TOKEN || "";
 
 function randomSuffix(length = 8) {
   return Math.random().toString(36).slice(2, 2 + length);
@@ -25,6 +26,14 @@ function toWsBaseUrl(httpBaseUrl) {
     return httpBaseUrl.replace("http://", "ws://");
   }
   return httpBaseUrl;
+}
+
+function toRoomWsUrl(roomIdOrPath) {
+  const base = toWsBaseUrl(baseUrl).replace(/\/$/, "");
+  if (roomIdOrPath.startsWith("/")) {
+    return `${base}${roomIdOrPath}`;
+  }
+  return `${base}/${roomIdOrPath}`;
 }
 
 function getMongoUri() {
@@ -134,6 +143,48 @@ async function connectProvider(roomId) {
   return { ydoc, provider };
 }
 
+async function assertWsRejected(roomIdOrPath, expectedStatusCode) {
+  const url = toRoomWsUrl(roomIdOrPath);
+
+  await new Promise((resolve, reject) => {
+    const ws = new WebSocket(url);
+    const timer = setTimeout(() => {
+      ws.terminate();
+      reject(new Error(`WebSocket rejection timeout for ${url}`));
+    }, 4000);
+
+    const onDone = (error) => {
+      clearTimeout(timer);
+      ws.removeAllListeners();
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    };
+
+    ws.on("open", () => {
+      onDone(new Error(`Expected WS rejection for ${url} but connection opened`));
+    });
+
+    ws.on("unexpected-response", (_request, response) => {
+      if (response.statusCode !== expectedStatusCode) {
+        onDone(
+          new Error(
+            `Expected WS rejection status ${expectedStatusCode} for ${url}, got ${response.statusCode}`,
+          ),
+        );
+        return;
+      }
+      onDone();
+    });
+
+    ws.on("error", () => {
+      onDone();
+    });
+  });
+}
+
 async function waitForPersistedUpdates(roomId, maxRetries = 20) {
   const client = new MongoClient(getMongoUri());
   await client.connect();
@@ -194,6 +245,13 @@ async function run() {
     assert(register.response.status === 201, "Room register should return 201");
     push("Room register succeeds", true, `roomId=${roomId}`);
 
+    await assertWsRejected("BAD", 400);
+    push("WS rejects invalid room ids", true, "status=400");
+
+    const unknownRoomId = buildRoomId("qa-day3-unknown");
+    await assertWsRejected(unknownRoomId, 404);
+    push("WS rejects unknown rooms", true, `roomId=${unknownRoomId}`);
+
     const firstSession = await connectProvider(roomId);
     sessions.push(firstSession);
     const nodesMap = firstSession.ydoc.getMap("nodes");
@@ -245,6 +303,24 @@ async function run() {
     sessions.pop();
 
     push("Yjs state restored after restart", true, `nodeCount=${reloadedNodes.size}`);
+
+    if (authToken) {
+      const archive = await request(`/api/rooms/${encodeURIComponent(roomId)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      if (archive.response.ok) {
+        await assertWsRejected(roomId, 404);
+        push("WS rejects archived rooms", true, `roomId=${roomId}`);
+      } else {
+        push("WS archived-room rejection", true, "skipped (token is not room owner)");
+      }
+    } else {
+      push("WS archived-room rejection", true, "skipped (set AUTH_BEARER_TOKEN to enable)");
+    }
   } catch (error) {
     push(
       "Day3 Yjs persistence smoke",
