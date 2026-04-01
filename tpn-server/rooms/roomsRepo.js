@@ -220,6 +220,7 @@ export async function claimRoomOwnership({ roomId, ownerId, claimToken }) {
       $set: {
         ownerId: ownerObjectId,
         updatedAt: now,
+        lastAccessedAt: now,
         claimedAt: now,
       },
       $unset: {
@@ -256,6 +257,23 @@ export async function claimRoomOwnership({ roomId, ownerId, claimToken }) {
   }
 
   throw buildError("claim_token_invalid_or_missing");
+}
+
+export async function touchRoomLastAccessed(roomId) {
+  const rooms = await getRoomsCollection();
+  const result = await rooms.updateOne(
+    {
+      _id: roomId,
+      status: { $ne: "archived" },
+    },
+    {
+      $set: {
+        lastAccessedAt: new Date(),
+      },
+    },
+  );
+
+  return result.modifiedCount === 1;
 }
 
 export async function getOwnedRooms(ownerId) {

@@ -9,6 +9,7 @@ import { corsMiddleware } from "./middleware/cors.js";
 import {
   initializeRoomsStorage,
   roomExists,
+  touchRoomLastAccessed,
 } from "./rooms/roomsRepo.js";
 import authRoutes from "./routes/authRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
@@ -27,6 +28,8 @@ app.use("/api/rooms", roomRoutes);
 
 const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
+const ACTIVE_ROOM_TOUCH_INTERVAL_MS = 10 * 60 * 1000;
+const activeRoomConnections = new Map();
 
 function rejectUpgrade(socket, statusCode, reason) {
   socket.write(
@@ -46,6 +49,37 @@ function resolveRoomIdFromUpgradeUrl(rawUrl) {
   };
 }
 
+function incrementRoomConnection(roomId) {
+  const current = activeRoomConnections.get(roomId) ?? 0;
+  activeRoomConnections.set(roomId, current + 1);
+}
+
+function decrementRoomConnection(roomId) {
+  const current = activeRoomConnections.get(roomId) ?? 0;
+  if (current <= 1) {
+    activeRoomConnections.delete(roomId);
+    return;
+  }
+  activeRoomConnections.set(roomId, current - 1);
+}
+
+async function touchRoomActivity(roomId) {
+  try {
+    await touchRoomLastAccessed(roomId);
+  } catch (error) {
+    console.error("Failed to refresh room activity", {
+      roomId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+setInterval(() => {
+  for (const roomId of activeRoomConnections.keys()) {
+    void touchRoomActivity(roomId);
+  }
+}, ACTIVE_ROOM_TOUCH_INTERVAL_MS).unref();
+
 server.on("upgrade", async (req, socket, head) => {
   const { roomId, search } = resolveRoomIdFromUpgradeUrl(req.url);
 
@@ -64,10 +98,14 @@ server.on("upgrade", async (req, socket, head) => {
     req.url = `/${roomId}${search}`;
 
     wss.handleUpgrade(req, socket, head, (ws) => {
+      incrementRoomConnection(roomId);
+      void touchRoomActivity(roomId);
+
       setupWSConnection(ws, req);
       console.log("WS Connection Established", { roomId });
 
       ws.on("close", () => {
+        decrementRoomConnection(roomId);
         console.log("WS Connection Closed", { roomId });
       });
     });
