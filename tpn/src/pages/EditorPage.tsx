@@ -176,10 +176,23 @@ export default function EditorPage() {
 
   const handleConfirmRenamePrompt = useCallback(
     (nextName: string) => {
-      void renameRoom(nextName).finally(() => {
-        setIsSavePromptOpen(false);
-        notify("Room renamed.", "success");
-      });
+      void (async () => {
+        const result = await renameRoom(nextName);
+
+        if (result === "persisted") {
+          setIsSavePromptOpen(false);
+          notify("Room renamed.", "success");
+          return;
+        }
+
+        if (result === "local_only") {
+          setIsSavePromptOpen(false);
+          notify("Name saved locally only. Owner login is required to persist.", "info");
+          return;
+        }
+
+        notify("Rename failed. Please try again.", "error");
+      })();
     },
     [notify, renameRoom],
   );

@@ -59,12 +59,16 @@ export async function checkRoomExists(roomId: string): Promise<boolean> {
     `${getRoomApiBaseUrl()}/api/rooms/${encodeURIComponent(roomId)}/exists`,
   );
 
+  const payload = (await response.json().catch(() => null)) as
+    | { exists?: boolean; error?: string }
+    | null;
+
   if (!response.ok) {
-    return false;
+    const errorCode = payload?.error || `room_exists_check_failed_${response.status}`;
+    throw new Error(errorCode);
   }
 
-  const payload = (await response.json()) as { exists?: boolean };
-  return payload.exists === true;
+  return payload?.exists === true;
 }
 
 export async function registerRoom(

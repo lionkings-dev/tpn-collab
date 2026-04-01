@@ -19,6 +19,8 @@ type UseEditorRoomAccessParams = {
   onJoinErrorRedirect: (message: string) => void;
 };
 
+export type RenameRoomResult = "persisted" | "local_only" | "failed";
+
 function saveRoomNameLocally(roomId: string, name: string) {
   localStorage.setItem(
     `${ROOM_META_PREFIX}${roomId}`,
@@ -113,19 +115,34 @@ export function useEditorRoomAccess({
 
   const renameRoom = useCallback(
     async (nextName: string) => {
-      setRoomName(nextName);
-
-      const currentUser = firebaseAuth.currentUser;
-      if (currentUser) {
-        try {
-          const idToken = await currentUser.getIdToken();
-          await renameOwnedRoom(activeRoomId, nextName, idToken);
-        } catch {
-          // Fallback remains local-only for non-owner/guest flows.
-        }
+      const normalizedName = nextName.trim();
+      if (!normalizedName) {
+        return "failed" as const;
       }
 
-      saveRoomNameLocally(activeRoomId, nextName);
+      const currentUser = firebaseAuth.currentUser;
+      if (!currentUser) {
+        setRoomName(normalizedName);
+        saveRoomNameLocally(activeRoomId, normalizedName);
+        return "local_only" as const;
+      }
+
+      try {
+        const idToken = await currentUser.getIdToken();
+        await renameOwnedRoom(activeRoomId, normalizedName, idToken);
+        setRoomName(normalizedName);
+        saveRoomNameLocally(activeRoomId, normalizedName);
+        return "persisted" as const;
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "";
+        if (code === "forbidden_room_owner_only" || code === "invalid_owner_id") {
+          setRoomName(normalizedName);
+          saveRoomNameLocally(activeRoomId, normalizedName);
+          return "local_only" as const;
+        }
+
+        return "failed" as const;
+      }
     },
     [activeRoomId],
   );
