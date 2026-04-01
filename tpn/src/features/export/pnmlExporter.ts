@@ -35,6 +35,14 @@ function toInteger(value: unknown, fallback = 0) {
   return Math.max(0, Math.floor(value));
 }
 
+function toBinaryMarking(value: unknown) {
+  const marking = toInteger(value, 0);
+  if (marking !== 0 && marking !== 1) {
+    throw new Error("pnml_export_invalid_initial_marking");
+  }
+  return marking;
+}
+
 function ensureExportGraphValidity(nodes: Node[], edges: Edge[]) {
   const ids = new Set<string>();
   for (const node of nodes) {
@@ -111,7 +119,7 @@ export function exportPnml(input: PnmlExportInput): string {
 
       appendGraphicsPosition(place, node.position.x, node.position.y);
 
-      const marking = toInteger(data.tokens, 0);
+      const marking = toBinaryMarking(data.tokens);
       const initialMarking = xmlDocument.createElementNS(
         PNML_NS,
         "initialMarking",

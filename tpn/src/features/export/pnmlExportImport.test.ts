@@ -91,4 +91,59 @@ describe("PNML export/import", () => {
     expect(edge.sourceHandle).toBe("b.source");
     expect(edge.targetHandle).toBe("l.target");
   });
+
+  it("rejects PNML import with non-binary place marking", () => {
+    const rawPnml = `<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="n1" type="http://www.pnml.org/version-2009/grammar/ptnet">
+    <page id="p1">
+      <place id="p1">
+        <name><text>P1</text></name>
+        <initialMarking><text>2</text></initialMarking>
+      </place>
+      <transition id="t1" />
+      <arc id="a1" source="p1" target="t1" />
+    </page>
+  </net>
+</pnml>`;
+
+    expect(() => importPnml(rawPnml)).toThrowError(
+      "pnml_import_invalid_initial_marking",
+    );
+  });
+
+  it("rejects PNML export with non-binary place marking", () => {
+    const nodes: Node[] = [
+      {
+        id: "p-1",
+        type: "place",
+        position: { x: 80, y: 100 },
+        data: { label: "P1", tokens: 2 },
+      },
+      {
+        id: "t-1",
+        type: "transition",
+        position: { x: 280, y: 100 },
+        data: { label: "T1", lb: 0, ub: 0, isEditing: false },
+      },
+    ];
+
+    const edges: Edge[] = [
+      {
+        id: "e-1",
+        source: "p-1",
+        target: "t-1",
+        type: "edge",
+      },
+    ];
+
+    expect(() =>
+      exportPnml({
+        roomId: "room-1",
+        roomName: "Binary Validation",
+        nodes,
+        edges,
+      }),
+    ).toThrowError("pnml_export_invalid_initial_marking");
+  });
 });

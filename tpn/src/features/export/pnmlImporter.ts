@@ -67,6 +67,14 @@ function toNonNegativeInteger(value: unknown, fallback = 0) {
   return fallback;
 }
 
+function parseBinaryMarking(value: unknown) {
+  const parsed = toNonNegativeInteger(value, 0);
+  if (parsed !== 0 && parsed !== 1) {
+    throw new Error("pnml_import_invalid_initial_marking");
+  }
+  return parsed;
+}
+
 function firstDirectChildByLocalName(parent: Element, localName: string) {
   return Array.from(parent.children).find(
     (child) => child.localName === localName,
@@ -240,10 +248,7 @@ export function importPnml(xmlContent: string): PnmlImportResult {
     if (nodeIds.has(id)) throw new Error("pnml_import_duplicate_node_id");
 
     const label = nestedText(place, ["name", "text"]) || id;
-    const tokens = toNonNegativeInteger(
-      nestedText(place, ["initialMarking", "text"]),
-      0,
-    );
+    const tokens = parseBinaryMarking(nestedText(place, ["initialMarking", "text"]));
 
     const node: Node = {
       id,
