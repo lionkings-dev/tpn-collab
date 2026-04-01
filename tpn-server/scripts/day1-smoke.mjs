@@ -79,6 +79,17 @@ async function run() {
     assert(existsAfter.json?.exists === true, "Expected room to exist after register");
     pushResult("Anonymous exists after register", true, `roomId=${anonRoomId}`);
 
+    const publicRoom = await request(`/api/rooms/${encodeURIComponent(anonRoomId)}`);
+    assert(publicRoom.response.ok, "Expected public room summary lookup to succeed");
+    assert(typeof publicRoom.json?.room?.name === "string", "Expected public room summary to include name");
+    assert(!("ownerId" in (publicRoom.json?.room || {})), "Public room summary should not expose ownerId");
+    assert(!("status" in (publicRoom.json?.room || {})), "Public room summary should not expose status");
+    pushResult("Public room summary is name-only", true, `roomId=${anonRoomId}`);
+
+    const privateRoomUnauth = await request(`/api/rooms/${encodeURIComponent(anonRoomId)}/private`);
+    assert(privateRoomUnauth.response.status === 401, "Expected private room metadata to require auth");
+    pushResult("Private room metadata requires auth", true, "401 without bearer");
+
     const registerAnonAgain = await request(`/api/rooms/${encodeURIComponent(anonRoomId)}/register`, {
       method: "POST",
       headers: {

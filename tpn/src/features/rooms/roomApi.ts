@@ -28,13 +28,17 @@ export type ClaimRoomResult = {
   claimStatus: "claimed" | "already_owned_by_you";
 };
 
-export async function getRoomById(roomId: string): Promise<OwnedRoom> {
+export type PublicRoomSummary = {
+  name: string;
+};
+
+export async function getRoomById(roomId: string): Promise<PublicRoomSummary> {
   const response = await fetch(`${getRoomApiBaseUrl()}/api/rooms/${encodeURIComponent(roomId)}`, {
     method: "GET",
   });
 
   const payload = (await response.json().catch(() => null)) as
-    | { ok?: boolean; room?: OwnedRoom; error?: string }
+    | { ok?: boolean; room?: PublicRoomSummary; error?: string }
     | null;
 
   if (!response.ok || !payload?.ok || !payload.room) {

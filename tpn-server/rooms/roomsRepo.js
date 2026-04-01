@@ -106,6 +106,51 @@ export async function getRoomById(roomId) {
   return normalizeRoomDoc(room);
 }
 
+export async function getPublicRoomById(roomId) {
+  const rooms = await getRoomsCollection();
+  const room = await rooms.findOne(
+    {
+      _id: roomId,
+      status: { $ne: "archived" },
+    },
+    {
+      projection: { _id: 0, name: 1 },
+    },
+  );
+
+  if (!room) {
+    throw buildError("room_not_found");
+  }
+
+  return {
+    name: room.name,
+  };
+}
+
+export async function getOwnedRoomById({ roomId, ownerId }) {
+  const rooms = await getRoomsCollection();
+  const ownerObjectId = toOwnerObjectId(ownerId);
+
+  if (!ownerObjectId) {
+    throw buildError("invalid_owner_id");
+  }
+
+  const room = await rooms.findOne({
+    _id: roomId,
+    status: { $ne: "archived" },
+  });
+
+  if (!room) {
+    throw buildError("room_not_found");
+  }
+
+  if (!room.ownerId || String(room.ownerId) !== String(ownerObjectId)) {
+    throw buildError("forbidden_room_owner_only");
+  }
+
+  return normalizeRoomDoc(room);
+}
+
 export async function registerRoom({ roomId, roomName, ownerId }) {
   const rooms = await getRoomsCollection();
   const now = new Date();

@@ -98,6 +98,13 @@ async function run() {
       assert(ownedRooms.some((room) => room.roomId === roomId), "Owned room list should include room");
       push("Owned rooms list includes claimed room", true, `roomId=${roomId}`);
 
+      const privateRoom = await request(`/api/rooms/${encodeURIComponent(roomId)}/private`, {
+        headers: authHeaders,
+      });
+      assert(privateRoom.response.ok, "Owner private room lookup should succeed");
+      assert(privateRoom.json?.room?.ownerId, "Private room metadata should include ownerId");
+      push("Owner can read private room metadata", true, `roomId=${roomId}`);
+
       const renamed = await request(`/api/rooms/${encodeURIComponent(roomId)}`, {
         method: "PATCH",
         headers: authHeaders,
