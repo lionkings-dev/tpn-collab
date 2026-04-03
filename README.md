@@ -1,0 +1,73 @@
+# TPN Collaboration Monorepo
+
+This repository contains the full TPN collaboration stack:
+
+- `tpn/`: React + TypeScript + Vite frontend
+- `tpn-server/`: Node.js + Express + MongoDB + Yjs backend
+
+## Repository Layout
+
+- `tpn/`
+  - User-facing editor UI, room flows, PNML import/export, auth client integration
+- `tpn-server/`
+  - Room APIs, auth verification, room lifecycle, WebSocket admission, Yjs persistence
+
+## Quick Start
+
+1. Install all dependencies:
+
+```bash
+npm run install:all
+```
+
+2. Configure environment variables:
+
+- Frontend: copy `tpn/.env.example` to `tpn/.env.local`
+- Backend: copy `tpn-server/.env.example` to `tpn-server/.env`
+- See `ENVIRONMENT.md` for full variable reference and deployment mapping
+
+3. Run both apps in development:
+
+```bash
+npm run dev
+```
+
+If you prefer separate terminals:
+
+```bash
+npm run dev:backend
+npm run dev:frontend
+```
+
+## Root Scripts
+
+- `npm run install:all`: install dependencies for both apps
+- `npm run dev`: run backend + frontend together (Linux/macOS shell)
+- `npm run dev:backend`: run backend only
+- `npm run dev:frontend`: run frontend only
+- `npm run build:frontend`: build frontend app
+- `npm run test:frontend`: run frontend unit tests
+- `npm run test:backend`: run backend day1/day2/day3 smoke scripts
+- `npm run test`: run frontend + backend test suites
+
+## Architecture Notes
+
+- Frontend talks to backend REST at `VITE_ROOM_API_URL`.
+- Frontend connects to Yjs WebSocket at `VITE_WS_URL`.
+- Backend validates room admission before WebSocket upgrade.
+- Backend persists collaborative Yjs updates to MongoDB.
+- Room metadata exposure policy:
+  - public room endpoint: name-only
+  - private room endpoint: owner-only metadata
+
+## Deployment
+
+- Frontend deploy config: `tpn/vercel.json`
+- Backend deploy config: `tpn-server/railway.json`
+- Keep frontend API/WS URLs aligned with backend deployment URL.
+- Set backend `CORS_ORIGIN` to the deployed frontend origin.
+
+## App-Level Docs
+
+- Frontend app docs: `tpn/README.md`
+- Frontend room flow notes: `tpn/QA_TODAY_ROOM_FLOW.md`

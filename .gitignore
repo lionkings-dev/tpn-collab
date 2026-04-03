@@ -16,7 +16,8 @@ dist-ssr
 !.env.example
 *firebase-adminsdk*.json
 
-*.md
+!README.md
+!ENVIRONMENT.md
 
 # Editor directories and files
 .vscode/*

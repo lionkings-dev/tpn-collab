@@ -1,0 +1,17 @@
+{
+  "name": "tpn-collab-repo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install:frontend": "npm --prefix tpn install",
+    "install:backend": "npm --prefix tpn-server install",
+    "install:all": "npm run install:frontend && npm run install:backend",
+    "dev:frontend": "npm --prefix tpn run dev",
+    "dev:backend": "npm --prefix tpn-server run dev",
+    "dev": "bash -c 'npm run dev:backend & npm run dev:frontend & wait'",
+    "build:frontend": "npm --prefix tpn run build",
+    "test:frontend": "npm --prefix tpn run test:unit",
+    "test:backend": "npm --prefix tpn-server run test:day1 && npm --prefix tpn-server run test:day2 && npm --prefix tpn-server run test:day3",
+    "test": "npm run test:frontend && npm run test:backend"
+  }
+}
