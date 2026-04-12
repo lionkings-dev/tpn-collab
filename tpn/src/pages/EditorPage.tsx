@@ -12,7 +12,17 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useFlow } from "../hooks/useFlow";
 import { useAwareness, useYjsProvider } from "../features/collaboration";
-import { exportPnml, importPnml } from "../features/export";
+import {
+  buildDownloadFileName,
+  detectImportFormat,
+  downloadTextFile,
+  exportGraph,
+  getFormatById,
+  importGraph,
+  listExportFormats,
+  listImportFormats,
+  type FormatId,
+} from "../features/export";
 import { useToastState } from "../features/editor/hooks/useToastState";
 import { useCursorLayer } from "../features/editor/hooks/useCursorLayer";
 import { useEditorRoomAccess } from "../features/editor/hooks/useEditorRoomAccess";
@@ -30,6 +40,8 @@ import { nodeTypes, edgeTypes } from "../flow-config";
 type RoomRouteState = {
   roomName?: string;
 };
+
+type ImportFormatId = FormatId | "auto";
 
 const FULL_SCREEN_EDITOR_STYLE = {
   width: "100vw",
@@ -53,15 +65,6 @@ function validateRoomName(value: string) {
   return null;
 }
 
-function toDownloadFileName(value: string) {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-");
-  const cleaned = normalized.replace(/-{2,}/g, "-").replace(/^-|-$/g, "");
-  return cleaned ? `${cleaned}.pnml` : "tpn-room.pnml";
-}
-
 export default function EditorPage() {
   // Routing + page-level UI state.
   const { roomId } = useParams<{ roomId: string }>();
@@ -72,6 +75,10 @@ export default function EditorPage() {
   // Cross-cutting UI feedback state.
   const { toast, notify, closeToast } = useToastState();
   const [isSavePromptOpen, setIsSavePromptOpen] = useState(false);
+  const [selectedExportFormat, setSelectedExportFormat] =
+    useState<FormatId>("pnml");
+  const [selectedImportFormat, setSelectedImportFormat] =
+    useState<ImportFormatId>("auto");
 
   // Root editor element used for pointer-to-canvas projection.
   const editorRef = useRef<HTMLDivElement | null>(null);
@@ -221,29 +228,32 @@ export default function EditorPage() {
     void logout();
   }, [logout]);
 
-  const handleExportPnml = useCallback(() => {
+  const exportFormats = useMemo(() => listExportFormats(), []);
+  const importFormats = useMemo(
+    () => [
+      { id: "auto" as const, label: "Auto" },
+      ...listImportFormats(),
+    ],
+    [],
+  );
+
+  const handleExport = useCallback((formatId: FormatId) => {
     try {
-      const pnml = exportPnml({
+      const serializedGraph = exportGraph(formatId, {
         roomId: activeRoomId,
         roomName,
         nodes,
         edges,
       });
+      const format = getFormatById(formatId);
+      const fileName = buildDownloadFileName(
+        roomName || activeRoomId,
+        format.extensions[0] || ".txt",
+      );
+      const mimeType = format.mimeTypes[0] || "text/plain;charset=utf-8";
 
-      const fileName = toDownloadFileName(roomName || activeRoomId);
-      const blob = new Blob([pnml], {
-        type: "application/xml;charset=utf-8",
-      });
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(objectUrl);
-
-      notify("PNML exported successfully.", "success");
+      downloadTextFile(serializedGraph, fileName, mimeType);
+      notify(`${format.label} exported successfully.`, "success");
     } catch {
       notify(
         "Export failed. Please verify your graph before retrying.",
@@ -252,21 +262,34 @@ export default function EditorPage() {
     }
   }, [activeRoomId, roomName, nodes, edges, notify]);
 
-  const handleImportPnml = useCallback(
+  const handleImport = useCallback(
     async (file: File) => {
       try {
         const content = await file.text();
-        const importedGraph = importPnml(content);
+        const resolvedFormatId =
+          selectedImportFormat === "auto"
+            ? detectImportFormat(content, file.name)
+            : selectedImportFormat;
+
+        if (!resolvedFormatId) {
+          throw new Error("import_format_not_detected");
+        }
+
+        const importedGraph = importGraph(content, {
+          formatId: selectedImportFormat,
+          fileName: file.name,
+        });
         replaceGraph(importedGraph.nodes, importedGraph.edges);
+        const format = getFormatById(resolvedFormatId);
         notify(
-          `PNML imported: ${importedGraph.nodes.length} nodes, ${importedGraph.edges.length} arcs.`,
+          `${format.label} imported: ${importedGraph.nodes.length} nodes, ${importedGraph.edges.length} arcs.`,
           "success",
         );
       } catch {
-        notify("Import failed. Please upload a valid PNML file.", "error");
+        notify("Import failed. Please upload a valid file for the selected format.", "error");
       }
     },
-    [notify, replaceGraph],
+    [notify, replaceGraph, selectedImportFormat],
   );
 
   if (isCheckingRoom || !isRoomAllowed) {
@@ -312,8 +335,14 @@ export default function EditorPage() {
           roomName={roomName}
           onOpenSavePrompt={handleOpenSavePrompt}
           onNotify={notify}
-          onExport={handleExportPnml}
-          onImportFile={handleImportPnml}
+          exportFormats={exportFormats}
+          selectedExportFormat={selectedExportFormat}
+          onExportFormatChange={setSelectedExportFormat}
+          onExport={handleExport}
+          importFormats={importFormats}
+          selectedImportFormat={selectedImportFormat}
+          onImportFormatChange={setSelectedImportFormat}
+          onImportFile={handleImport}
           currentUserName={authDisplayName}
           isAuthenticated={isAuthenticated}
           isAuthLoading={authLoading || isAuthActionLoading}

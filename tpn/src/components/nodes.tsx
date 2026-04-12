@@ -1,5 +1,5 @@
 import { Handle, Position } from "@xyflow/react";
-import type { ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import "./nodes.css";
 
 type PlaceNodeData = {
@@ -7,13 +7,33 @@ type PlaceNodeData = {
   tokens?: number;
 };
 
+type TransitionBound = number | null;
+
 type TransitionNodeData = {
   label: string;
-  lb: number;
-  ub: number;
+  lb: TransitionBound;
+  ub: TransitionBound;
   isEditing?: boolean;
-  updateTransitionTime: (nodeId: string, lb: number, ub: number) => void;
+  updateTransitionTime: (
+    nodeId: string,
+    lb: TransitionBound,
+    ub: TransitionBound,
+  ) => boolean;
 };
+
+function formatTransitionBound(bound: TransitionBound) {
+  return bound === null ? "inf" : String(bound);
+}
+
+function parseTransitionBoundInput(input: string) {
+  const value = input.trim().toLowerCase();
+  if (!value) return undefined;
+  if (value === "inf" || value === "infinity") return null;
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return undefined;
+  return parsed;
+}
 
 export function PlaceNode({ data }: { data: PlaceNodeData }) {
   return (
@@ -39,17 +59,54 @@ export function TransitionNode({
   id: string;
   data: TransitionNodeData;
 }) {
+  const [lbInput, setLbInput] = useState(() => formatTransitionBound(data.lb));
+  const [ubInput, setUbInput] = useState(() => formatTransitionBound(data.ub));
+
+  useEffect(() => {
+    setLbInput(formatTransitionBound(data.lb));
+  }, [data.lb]);
+
+  useEffect(() => {
+    setUbInput(formatTransitionBound(data.ub));
+  }, [data.ub]);
+
   const onLbChange = (evt: ChangeEvent<HTMLInputElement>) => {
-    const newLb = parseInt(evt.target.value, 10);
-    if (!isNaN(newLb)) {
-      data.updateTransitionTime(id, newLb, data.ub);
-    }
+    setLbInput(evt.target.value);
   };
 
   const onUbChange = (evt: ChangeEvent<HTMLInputElement>) => {
-    const newUb = parseInt(evt.target.value, 10);
-    if (!isNaN(newUb)) {
-      data.updateTransitionTime(id, data.lb, newUb);
+    setUbInput(evt.target.value);
+  };
+
+  const commitLb = () => {
+    const nextLb = parseTransitionBoundInput(lbInput);
+    if (nextLb === undefined) {
+      setLbInput(formatTransitionBound(data.lb));
+      return;
+    }
+
+    const updated = data.updateTransitionTime(id, nextLb, data.ub);
+    if (!updated) {
+      setLbInput(formatTransitionBound(data.lb));
+    }
+  };
+
+  const commitUb = () => {
+    const nextUb = parseTransitionBoundInput(ubInput);
+    if (nextUb === undefined) {
+      setUbInput(formatTransitionBound(data.ub));
+      return;
+    }
+
+    const updated = data.updateTransitionTime(id, data.lb, nextUb);
+    if (!updated) {
+      setUbInput(formatTransitionBound(data.ub));
+    }
+  };
+
+  const onBoundKeyDown = (evt: KeyboardEvent<HTMLInputElement>) => {
+    if (evt.key === "Enter") {
+      evt.currentTarget.blur();
     }
   };
 
@@ -59,13 +116,27 @@ export function TransitionNode({
       {data.isEditing && (
         <div className="edit-box">
           <label>lb:</label>
-          <input type="number" min="0" value={data.lb} onChange={onLbChange} />
+          <input
+            type="text"
+            value={lbInput}
+            onChange={onLbChange}
+            onBlur={commitLb}
+            onKeyDown={onBoundKeyDown}
+            placeholder="0 or inf"
+          />
           <label>ub:</label>
-          <input type="number" min="0" value={data.ub} onChange={onUbChange} />
+          <input
+            type="text"
+            value={ubInput}
+            onChange={onUbChange}
+            onBlur={commitUb}
+            onKeyDown={onBoundKeyDown}
+            placeholder="0 or inf"
+          />
         </div>
       )}
       <div>
-        <div className="time">{`[${data.lb}, ${data.ub}]`}</div>
+        <div className="time">{`[${formatTransitionBound(data.lb)}, ${formatTransitionBound(data.ub)}]`}</div>
       </div>
       <Handle type="target" position={Position.Left} id="l.target" />
       <Handle type="source" position={Position.Left} id="l.source" />

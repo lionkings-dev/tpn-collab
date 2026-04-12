@@ -67,6 +67,47 @@ describe("PNML export/import", () => {
     expect(importedEdge.data?.weight).toBe(3);
   });
 
+  it("supports infinity upper bound on roundtrip", () => {
+    const nodes: Node[] = [
+      {
+        id: "p-1",
+        type: "place",
+        position: { x: 80, y: 100 },
+        data: { label: "P1", tokens: 0 },
+      },
+      {
+        id: "t-1",
+        type: "transition",
+        position: { x: 280, y: 100 },
+        data: { label: "T1", lb: 2, ub: null, isEditing: false },
+      },
+    ];
+
+    const edges: Edge[] = [
+      {
+        id: "e-1",
+        source: "p-1",
+        target: "t-1",
+        type: "edge",
+      },
+    ];
+
+    const pnml = exportPnml({
+      roomId: "room-1",
+      roomName: "Infinity UB",
+      nodes,
+      edges,
+    });
+
+    expect(pnml).toMatch(/<ub>\s*inf\s*<\/ub>/);
+
+    const imported = importPnml(pnml);
+    const importedTransition = imported.nodes.find((node) => node.id === "t-1");
+
+    expect(importedTransition?.data.lb).toBe(2);
+    expect(importedTransition?.data.ub).toBeNull();
+  });
+
   it("infers handles for arcs without toolspecific handle hints", () => {
     const rawPnml = `<?xml version="1.0" encoding="UTF-8"?>
 <pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
@@ -145,5 +186,64 @@ describe("PNML export/import", () => {
         edges,
       }),
     ).toThrowError("pnml_export_invalid_initial_marking");
+  });
+
+  it("rejects PNML import with invalid transition interval", () => {
+    const rawPnml = `<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="n1" type="http://www.pnml.org/version-2009/grammar/ptnet">
+    <page id="p1">
+      <place id="p1" />
+      <transition id="t1">
+        <toolspecific tool="tpn-collab" version="1.0">
+          <timeInterval>
+            <lb>inf</lb>
+            <ub>3</ub>
+          </timeInterval>
+        </toolspecific>
+      </transition>
+      <arc id="a1" source="p1" target="t1" />
+    </page>
+  </net>
+</pnml>`;
+
+    expect(() => importPnml(rawPnml)).toThrowError(
+      "pnml_import_invalid_transition_interval",
+    );
+  });
+
+  it("rejects PNML export with invalid transition interval", () => {
+    const nodes: Node[] = [
+      {
+        id: "p-1",
+        type: "place",
+        position: { x: 80, y: 100 },
+        data: { label: "P1", tokens: 0 },
+      },
+      {
+        id: "t-1",
+        type: "transition",
+        position: { x: 280, y: 100 },
+        data: { label: "T1", lb: null, ub: 5, isEditing: false },
+      },
+    ];
+
+    const edges: Edge[] = [
+      {
+        id: "e-1",
+        source: "p-1",
+        target: "t-1",
+        type: "edge",
+      },
+    ];
+
+    expect(() =>
+      exportPnml({
+        roomId: "room-1",
+        roomName: "Invalid Transition Interval",
+        nodes,
+        edges,
+      }),
+    ).toThrowError("pnml_export_invalid_transition_interval");
   });
 });

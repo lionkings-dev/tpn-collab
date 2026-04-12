@@ -19,18 +19,27 @@
   white-space: nowrap;
 }
 
-.editor-header button {
+.editor-header button,
+.editor-format-select {
   background: none;
   border: 1px solid var(--fg-alt-color);
   color: var(--fg-color);
   padding: 6px 12px;
   border-radius: 4px;
-  cursor: pointer;
   background-color: var(--bg-color);
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.editor-header button:hover {
+.editor-format-select {
+  cursor: pointer;
+}
+
+.editor-header button {
+  cursor: pointer;
+}
+
+.editor-header button:hover,
+.editor-format-select:hover {
   background-color: var(--accent-secondary);
   color: var(--bg-color);
   border-color: var(--accent-secondary);

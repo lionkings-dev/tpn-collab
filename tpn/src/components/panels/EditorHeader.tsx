@@ -2,13 +2,25 @@ import React, { useCallback, useRef } from "react";
 import { Panel } from "@xyflow/react";
 import "./EditorHeader.css";
 import type { ToastType } from "./toastPopup";
+import type { ExportFormatOption, FormatId } from "../../features/export";
+
+type ImportFormatOption = {
+  id: FormatId | "auto";
+  label: string;
+};
 
 type EditorHeaderProps = {
   roomId: string;
   roomName: string;
   onOpenSavePrompt: () => void;
   onNotify: (message: string, type?: ToastType) => void;
-  onExport: () => void;
+  exportFormats: ExportFormatOption[];
+  selectedExportFormat: FormatId;
+  onExportFormatChange: (formatId: FormatId) => void;
+  onExport: (formatId: FormatId) => void;
+  importFormats: ImportFormatOption[];
+  selectedImportFormat: FormatId | "auto";
+  onImportFormatChange: (formatId: FormatId | "auto") => void;
   onImportFile: (file: File) => void | Promise<void>;
   currentUserName: string | null;
   isAuthenticated: boolean;
@@ -22,7 +34,13 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   roomName,
   onOpenSavePrompt,
   onNotify,
+  exportFormats,
+  selectedExportFormat,
+  onExportFormatChange,
   onExport,
+  importFormats,
+  selectedImportFormat,
+  onImportFormatChange,
   onImportFile,
   currentUserName,
   isAuthenticated,
@@ -77,7 +95,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
       if (!file) return;
 
       void Promise.resolve(onImportFile(file)).catch(() => {
-        onNotify("Import failed. Please check your PNML file.", "error");
+        onNotify("Import failed. Please check your file format.", "error");
       });
     },
     [onImportFile, onNotify],
@@ -88,12 +106,38 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
       <span className="room-name">{roomName}</span>
       <button onClick={handleInvite}>Invite</button>
       <button onClick={onOpenSavePrompt}>Rename Room</button>
-      <button onClick={onExport}>Export</button>
+      <select
+        className="editor-format-select"
+        value={selectedExportFormat}
+        onChange={(event) => onExportFormatChange(event.target.value as FormatId)}
+        aria-label="Select export format"
+      >
+        {exportFormats.map((format) => (
+          <option key={format.id} value={format.id}>
+            {format.label}
+          </option>
+        ))}
+      </select>
+      <button onClick={() => onExport(selectedExportFormat)}>Export</button>
+      <select
+        className="editor-format-select"
+        value={selectedImportFormat}
+        onChange={(event) =>
+          onImportFormatChange(event.target.value as FormatId | "auto")
+        }
+        aria-label="Select import format"
+      >
+        {importFormats.map((format) => (
+          <option key={format.id} value={format.id}>
+            {format.label}
+          </option>
+        ))}
+      </select>
       <button onClick={handleImportClick}>Import</button>
       <input
         ref={importInputRef}
         type="file"
-        accept=".pnml,.xml,application/xml,text/xml"
+        accept=".pnml,.xml,.ppp,.spec,.txt,application/xml,text/xml,text/plain"
         style={{ display: "none" }}
         onChange={handleImportFileChange}
       />
