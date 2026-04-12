@@ -78,6 +78,14 @@
   text-align: left;
   transition: color 0.3s ease;
 }
+.transition-node .label {
+  font-size: 10px;
+  margin-top: 2px;
+  position: absolute;
+  top: 100%;
+  color: #303030;
+  transition: color 0.3s ease;
+}
 
 .react-flow__node.selected .transition-node .time {
   color: #111111;

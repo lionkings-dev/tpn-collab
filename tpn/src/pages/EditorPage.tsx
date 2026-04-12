@@ -4,6 +4,7 @@ import {
   Controls,
   MarkerType,
   type ColorMode,
+  type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useState, useMemo, useRef, useCallback } from "react";
@@ -53,7 +54,10 @@ function validateRoomName(value: string) {
 }
 
 function toDownloadFileName(value: string) {
-  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-");
   const cleaned = normalized.replace(/-{2,}/g, "-").replace(/^-|-$/g, "");
   return cleaned ? `${cleaned}.pnml` : "tpn-room.pnml";
 }
@@ -63,7 +67,7 @@ export default function EditorPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const [colorMode, setColorMode] = useState<ColorMode>("dark");
+  const [colorMode, setColorMode] = useState<ColorMode>("system");
 
   // Cross-cutting UI feedback state.
   const { toast, notify, closeToast } = useToastState();
@@ -71,6 +75,7 @@ export default function EditorPage() {
 
   // Root editor element used for pointer-to-canvas projection.
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<Viewport>({ x: 0, y: 0, zoom: 1 });
 
   // Auth session and identity used in header and awareness labels.
   const {
@@ -150,6 +155,14 @@ export default function EditorPage() {
     clearLocalCursor,
   });
 
+  const onViewportChange = useCallback(
+    (vp: Viewport) => {
+      handleViewportChange(vp);
+      viewportRef.current = vp;
+    },
+    [handleViewportChange],
+  );
+
   // React Flow state/actions synchronized to Yjs maps.
   const {
     nodes,
@@ -164,7 +177,7 @@ export default function EditorPage() {
     replaceGraph,
     addToken,
     onNodeDoubleClick,
-  } = useFlow(ydoc);
+  } = useFlow(ydoc, () => viewportRef.current);
 
   const handleOpenSavePrompt = useCallback(() => {
     setIsSavePromptOpen(true);
@@ -187,7 +200,10 @@ export default function EditorPage() {
 
         if (result === "local_only") {
           setIsSavePromptOpen(false);
-          notify("Name saved locally only. Owner login is required to persist.", "info");
+          notify(
+            "Name saved locally only. Owner login is required to persist.",
+            "info",
+          );
           return;
         }
 
@@ -229,7 +245,10 @@ export default function EditorPage() {
 
       notify("PNML exported successfully.", "success");
     } catch {
-      notify("Export failed. Please verify your graph before retrying.", "error");
+      notify(
+        "Export failed. Please verify your graph before retrying.",
+        "error",
+      );
     }
   }, [activeRoomId, roomName, nodes, edges, notify]);
 
@@ -282,7 +301,7 @@ export default function EditorPage() {
         colorMode={colorMode}
         style={{ background: "#ffffff" }}
         onMove={(_event, nextViewport) => {
-          handleViewportChange(nextViewport);
+          onViewportChange(nextViewport);
         }}
         fitView
       >

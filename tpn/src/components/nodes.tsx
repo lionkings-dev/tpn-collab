@@ -8,6 +8,7 @@ type PlaceNodeData = {
 };
 
 type TransitionNodeData = {
+  label: string;
   lb: number;
   ub: number;
   isEditing?: boolean;
@@ -54,6 +55,7 @@ export function TransitionNode({
 
   return (
     <div className="transition-node">
+      <div className="label">{data.label}</div>
       {data.isEditing && (
         <div className="edit-box">
           <label>lb:</label>

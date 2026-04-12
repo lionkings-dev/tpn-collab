@@ -9,6 +9,7 @@ import {
   type Connection,
   type NodeChange,
   type EdgeChange,
+  type Viewport,
 } from "@xyflow/react";
 
 import * as Y from "yjs";
@@ -27,7 +28,10 @@ function createId(prefix: string) {
   return `${prefix}-${timePart}${randomPart}`;
 }
 
-export function useFlow(ydoc: Y.Doc) {
+export function useFlow(
+  ydoc: Y.Doc,
+  getViewport: () => Viewport,
+) {
   const [nodes, setNodes] = useNodesState<Node>([]);
   const [edges, setEdges] = useEdgesState<Edge>([]);
 
@@ -225,32 +229,46 @@ export function useFlow(ydoc: Y.Doc) {
   );
 
   const addPlaces = useCallback(() => {
-    const placeLabel = `p${yNodes.size + 1}`;
+    const placeCount = Array.from(yNodes.values()).filter(
+      (n) => n.type === "place",
+    ).length;
+    const placeLabel = `p${placeCount + 1}`;
+
+    const viewport = getViewport();
+    const offsetX = (Math.random() - 0.5) * 100;
+    const offsetY = (Math.random() - 0.5) * 100;
+    const x = (-viewport.x + window.innerWidth / 2) / viewport.zoom + offsetX;
+    const y = (-viewport.y + window.innerHeight / 2) / viewport.zoom + offsetY;
+
     const newNode: Node = {
       id: createId("p"),
       data: { label: placeLabel, tokens: 0 },
       type: "place",
-      position: {
-        x: Math.random() * window.innerWidth - 100,
-        y: Math.random() * window.innerHeight,
-      },
+      position: { x, y },
     };
     yNodes.set(newNode.id, newNode);
-  }, [yNodes]);
+  }, [yNodes, getViewport]);
 
   const addTransition = useCallback(() => {
-    const transitionLabel = `t${yEdges.size + 1}`;
+    const transitionCount = Array.from(yNodes.values()).filter(
+      (n) => n.type === "transition",
+    ).length;
+    const transitionLabel = `t${transitionCount + 1}`;
+
+    const viewport = getViewport();
+    const offsetX = (Math.random() - 0.5) * 100;
+    const offsetY = (Math.random() - 0.5) * 100;
+    const x = (-viewport.x + window.innerWidth / 2) / viewport.zoom + offsetX;
+    const y = (-viewport.y + window.innerHeight / 2) / viewport.zoom + offsetY;
+
     const newNode: Node = {
       id: createId("t"),
       data: { label: transitionLabel, lb: 0, ub: 0, isEditing: false },
       type: "transition",
-      position: {
-        x: Math.random() * window.innerWidth - 100,
-        y: Math.random() * window.innerHeight,
-      },
+      position: { x, y },
     };
     yNodes.set(newNode.id, newNode);
-  }, [yEdges, yNodes]);
+  }, [yNodes, getViewport]);
 
   const clearCanvas = useCallback(() => {
     yNodes.clear();
