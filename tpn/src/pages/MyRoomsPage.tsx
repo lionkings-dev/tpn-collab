@@ -64,7 +64,7 @@ export default function MyRoomsPage() {
   const handleDelete = async (room: OwnedRoom) => {
     if (!user) return;
 
-    const accepted = window.confirm(`Archive room \"${room.name}\"?`);
+    const accepted = window.confirm(`Archive room "${room.name}"?`);
     if (!accepted) return;
 
     try {

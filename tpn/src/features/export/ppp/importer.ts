@@ -28,7 +28,7 @@ type EdgeHandles = {
 };
 
 const CONNECTION_RE =
-  /^([^\s\[]+)\s*(?:\[\s*([^,\]]+)\s*,\s*([^\]]+)\s*\])?\s*\(([^)]*)\)\s*\/\s*\(([^)]*)\)\s*;$/;
+  /^([^\s[]+)\s*(?:\[\s*([^,\]]+)\s*,\s*([^\]]+)\s*\])?\s*\(([^)]*)\)\s*\/\s*\(([^)]*)\)\s*;$/;
 const DEFINITION_RE = /^([^\s=]+)\s*=\s*\(([^)]*)\)\s*;$/;
 
 function parseCsvList(segment: string) {
