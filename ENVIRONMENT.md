@@ -50,6 +50,17 @@ Set these in `tpn-server/.env` (use `tpn-server/.env.example` as baseline).
 ## Deployment Notes
 
 - Frontend deploy config: `tpn/vercel.json`
-- Backend deploy config: `tpn-server/railway.json`
+- Backend deploy config: `railway.json`
+
+Railway workspace deployment settings:
+
+- Root directory: repository root
+- Build command: `npm install`
+- Start command: `npm run start:backend`
+- Watch paths:
+  - `tpn-server/**`
+  - `packages/contracts/**`
+  - `package.json`
+  - `package-lock.json`
 
 Set production variables so the frontend points to deployed backend HTTP/WS URLs, and the backend allows frontend origin via `CORS_ORIGIN`.
