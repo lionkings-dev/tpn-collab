@@ -12,6 +12,7 @@
     "pnml:format": "node utils/format-pnml.mjs"
   },
   "dependencies": {
+    "@tpn/contracts": "*",
     "@xyflow/react": "^12.9.3",
     "firebase": "^12.3.0",
     "react": "^19.1.1",

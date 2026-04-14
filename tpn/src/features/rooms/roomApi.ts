@@ -1,35 +1,21 @@
 import { resolveApiBaseUrl } from "../../config/network";
+import type {
+  ClaimRoomResult,
+  OwnedRoom,
+  PublicRoomSummary,
+  RegisteredRoomResponse,
+} from "@tpn/contracts/room-contracts";
+
+export type {
+  ClaimRoomResult,
+  OwnedRoom,
+  PublicRoomSummary,
+  RegisteredRoomResponse,
+};
 
 export type RegisterRoomOptions = {
   idToken?: string;
   name?: string;
-};
-
-export type RegisteredRoomResponse = {
-  ok: true;
-  roomId: string;
-  ownerId: string | null;
-  claimToken: string | null;
-};
-
-export type OwnedRoom = {
-  roomId: string;
-  name: string;
-  ownerId: string | null;
-  visibility: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  lastAccessedAt: string;
-};
-
-export type ClaimRoomResult = {
-  room: OwnedRoom;
-  claimStatus: "claimed" | "already_owned_by_you";
-};
-
-export type PublicRoomSummary = {
-  name: string;
 };
 
 export async function getRoomById(roomId: string): Promise<PublicRoomSummary> {

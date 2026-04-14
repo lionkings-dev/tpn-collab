@@ -1,9 +1,10 @@
-# TPN Collaboration Monorepo
+# TPN Collaboration Workspace Monorepo
 
 This repository contains the full TPN collaboration stack:
 
 - `tpn/`: React + TypeScript + Vite frontend
 - `tpn-server/`: Node.js + Express + MongoDB + Yjs backend
+- `packages/`: shared workspace packages (contracts/utilities)
 
 ## Repository Layout
 
@@ -15,6 +16,12 @@ This repository contains the full TPN collaboration stack:
 ## Quick Start
 
 1. Install all dependencies:
+
+```bash
+npm install
+```
+
+Optional compatibility command:
 
 ```bash
 npm run install:all
@@ -41,10 +48,11 @@ npm run dev:frontend
 
 ## Root Scripts
 
-- `npm run install:all`: install dependencies for both apps
+- `npm install` or `npm run install:all`: install workspace dependencies
 - `npm run dev`: run backend + frontend together (Linux/macOS shell)
 - `npm run dev:backend`: run backend only
 - `npm run dev:frontend`: run frontend only
+- `npm run start:backend`: start backend in production mode
 - `npm run build:frontend`: build frontend app
 - `npm run test:frontend`: run frontend unit tests
 - `npm run test:backend`: run backend day1/day2/day3 smoke scripts

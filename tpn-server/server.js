@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { setupWSConnection } from "@y/websocket-server/utils";
+import { ROOM_ERROR_CODES } from "@tpn/contracts/error-codes";
 import express from "express";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
@@ -84,14 +85,14 @@ server.on("upgrade", async (req, socket, head) => {
   const { roomId, search } = resolveRoomIdFromUpgradeUrl(req.url);
 
   if (!roomId || !isValidRoomId(roomId)) {
-    rejectUpgrade(socket, 400, "invalid_room_id");
+    rejectUpgrade(socket, 400, ROOM_ERROR_CODES.INVALID_ROOM_ID);
     return;
   }
 
   try {
     const exists = await roomExists(roomId);
     if (!exists) {
-      rejectUpgrade(socket, 404, "room_not_found");
+      rejectUpgrade(socket, 404, ROOM_ERROR_CODES.ROOM_NOT_FOUND);
       return;
     }
 
@@ -114,7 +115,7 @@ server.on("upgrade", async (req, socket, head) => {
       roomId,
       error: error instanceof Error ? error.message : String(error),
     });
-    rejectUpgrade(socket, 503, "room_admission_failed");
+    rejectUpgrade(socket, 503, ROOM_ERROR_CODES.ROOM_ADMISSION_FAILED);
   }
 });
 

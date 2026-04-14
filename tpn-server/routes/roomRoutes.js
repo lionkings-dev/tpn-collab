@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ROOM_ERROR_CODES } from "@tpn/contracts/error-codes";
 
 import { attachAuthIfPresent } from "../auth/attachAuthIfPresent.js";
 import { requireAuth } from "../auth/requireAuth.js";
@@ -20,7 +21,7 @@ roomRoutes.get("/:roomId/exists", async (req, res) => {
   const roomId = normalizeRoomId(req.params.roomId);
 
   if (!roomId || !isValidRoomId(roomId)) {
-    res.status(400).json({ exists: false, error: "invalid_room_id" });
+    res.status(400).json({ exists: false, error: ROOM_ERROR_CODES.INVALID_ROOM_ID });
     return;
   }
 
@@ -34,7 +35,7 @@ roomRoutes.get("/:roomId/exists", async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Room lookup failed.";
     if (message.includes("MONGODB_URI is required")) {
-      res.status(503).json({ exists: false, error: "db_not_configured" });
+      res.status(503).json({ exists: false, error: ROOM_ERROR_CODES.DB_NOT_CONFIGURED });
       return;
     }
 
@@ -43,7 +44,7 @@ roomRoutes.get("/:roomId/exists", async (req, res) => {
       return;
     }
 
-    res.status(500).json({ exists: false, error: "room_lookup_failed" });
+    res.status(500).json({ exists: false, error: ROOM_ERROR_CODES.ROOM_LOOKUP_FAILED });
   }
 });
 
@@ -51,7 +52,7 @@ roomRoutes.post("/:roomId/register", attachAuthIfPresent, async (req, res) => {
   const roomId = normalizeRoomId(req.params.roomId);
 
   if (!roomId || !isValidRoomId(roomId)) {
-    res.status(400).json({ ok: false, error: "invalid_room_id" });
+    res.status(400).json({ ok: false, error: ROOM_ERROR_CODES.INVALID_ROOM_ID });
     return;
   }
 
@@ -72,7 +73,7 @@ roomRoutes.post("/:roomId/register", attachAuthIfPresent, async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Room register failed.";
     if (message.includes("MONGODB_URI is required")) {
-      res.status(503).json({ ok: false, error: "db_not_configured" });
+      res.status(503).json({ ok: false, error: ROOM_ERROR_CODES.DB_NOT_CONFIGURED });
       return;
     }
 
@@ -81,7 +82,7 @@ roomRoutes.post("/:roomId/register", attachAuthIfPresent, async (req, res) => {
       return;
     }
 
-    res.status(500).json({ ok: false, error: "room_register_failed" });
+    res.status(500).json({ ok: false, error: ROOM_ERROR_CODES.ROOM_REGISTER_FAILED });
   }
 });
 
@@ -89,7 +90,7 @@ roomRoutes.post("/:roomId/claim", requireAuth, async (req, res) => {
   const roomId = normalizeRoomId(req.params.roomId);
 
   if (!roomId || !isValidRoomId(roomId)) {
-    res.status(400).json({ ok: false, error: "invalid_room_id" });
+    res.status(400).json({ ok: false, error: ROOM_ERROR_CODES.INVALID_ROOM_ID });
     return;
   }
 
@@ -110,28 +111,31 @@ roomRoutes.post("/:roomId/claim", requireAuth, async (req, res) => {
   } catch (error) {
     const code = error instanceof Error && "code" in error ? error.code : null;
 
-    if (code === "room_not_found") {
+    if (code === ROOM_ERROR_CODES.ROOM_NOT_FOUND) {
       res.status(404).json({ ok: false, error: code });
       return;
     }
 
-    if (code === "room_already_claimed") {
+    if (code === ROOM_ERROR_CODES.ROOM_ALREADY_CLAIMED) {
       res.status(409).json({ ok: false, error: code });
       return;
     }
 
-    if (code === "claim_token_invalid_or_missing" || code === "invalid_owner_id") {
+    if (
+      code === ROOM_ERROR_CODES.CLAIM_TOKEN_INVALID_OR_MISSING ||
+      code === ROOM_ERROR_CODES.INVALID_OWNER_ID
+    ) {
       res.status(400).json({ ok: false, error: code });
       return;
     }
 
     const message = error instanceof Error ? error.message : "Room claim failed.";
     if (message.includes("MONGODB_URI is required")) {
-      res.status(503).json({ ok: false, error: "db_not_configured" });
+      res.status(503).json({ ok: false, error: ROOM_ERROR_CODES.DB_NOT_CONFIGURED });
       return;
     }
 
-    res.status(500).json({ ok: false, error: "room_claim_failed" });
+    res.status(500).json({ ok: false, error: ROOM_ERROR_CODES.ROOM_CLAIM_FAILED });
   }
 });
 
@@ -141,18 +145,18 @@ roomRoutes.get("/mine", requireAuth, async (req, res) => {
     res.json({ ok: true, rooms });
   } catch (error) {
     const code = error instanceof Error && "code" in error ? error.code : null;
-    if (code === "invalid_owner_id") {
+    if (code === ROOM_ERROR_CODES.INVALID_OWNER_ID) {
       res.status(400).json({ ok: false, error: code });
       return;
     }
 
     const message = error instanceof Error ? error.message : "Load owned rooms failed.";
     if (message.includes("MONGODB_URI is required")) {
-      res.status(503).json({ ok: false, error: "db_not_configured" });
+      res.status(503).json({ ok: false, error: ROOM_ERROR_CODES.DB_NOT_CONFIGURED });
       return;
     }
 
-    res.status(500).json({ ok: false, error: "owned_rooms_load_failed" });
+    res.status(500).json({ ok: false, error: ROOM_ERROR_CODES.OWNED_ROOMS_LOAD_FAILED });
   }
 });
 
@@ -160,7 +164,7 @@ roomRoutes.get("/:roomId/private", requireAuth, async (req, res) => {
   const roomId = normalizeRoomId(req.params.roomId);
 
   if (!roomId || !isValidRoomId(roomId)) {
-    res.status(400).json({ ok: false, error: "invalid_room_id" });
+    res.status(400).json({ ok: false, error: ROOM_ERROR_CODES.INVALID_ROOM_ID });
     return;
   }
 
@@ -172,26 +176,26 @@ roomRoutes.get("/:roomId/private", requireAuth, async (req, res) => {
     res.json({ ok: true, room });
   } catch (error) {
     const code = error instanceof Error && "code" in error ? error.code : null;
-    if (code === "room_not_found") {
+    if (code === ROOM_ERROR_CODES.ROOM_NOT_FOUND) {
       res.status(404).json({ ok: false, error: code });
       return;
     }
-    if (code === "forbidden_room_owner_only") {
+    if (code === ROOM_ERROR_CODES.FORBIDDEN_ROOM_OWNER_ONLY) {
       res.status(403).json({ ok: false, error: code });
       return;
     }
-    if (code === "invalid_owner_id") {
+    if (code === ROOM_ERROR_CODES.INVALID_OWNER_ID) {
       res.status(400).json({ ok: false, error: code });
       return;
     }
 
     const message = error instanceof Error ? error.message : "Room load failed.";
     if (message.includes("MONGODB_URI is required")) {
-      res.status(503).json({ ok: false, error: "db_not_configured" });
+      res.status(503).json({ ok: false, error: ROOM_ERROR_CODES.DB_NOT_CONFIGURED });
       return;
     }
 
-    res.status(500).json({ ok: false, error: "room_load_failed" });
+    res.status(500).json({ ok: false, error: ROOM_ERROR_CODES.ROOM_LOAD_FAILED });
   }
 });
 
@@ -199,7 +203,7 @@ roomRoutes.get("/:roomId", async (req, res) => {
   const roomId = normalizeRoomId(req.params.roomId);
 
   if (!roomId || !isValidRoomId(roomId)) {
-    res.status(400).json({ ok: false, error: "invalid_room_id" });
+    res.status(400).json({ ok: false, error: ROOM_ERROR_CODES.INVALID_ROOM_ID });
     return;
   }
 
@@ -208,18 +212,18 @@ roomRoutes.get("/:roomId", async (req, res) => {
     res.json({ ok: true, room });
   } catch (error) {
     const code = error instanceof Error && "code" in error ? error.code : null;
-    if (code === "room_not_found") {
+    if (code === ROOM_ERROR_CODES.ROOM_NOT_FOUND) {
       res.status(404).json({ ok: false, error: code });
       return;
     }
 
     const message = error instanceof Error ? error.message : "Room load failed.";
     if (message.includes("MONGODB_URI is required")) {
-      res.status(503).json({ ok: false, error: "db_not_configured" });
+      res.status(503).json({ ok: false, error: ROOM_ERROR_CODES.DB_NOT_CONFIGURED });
       return;
     }
 
-    res.status(500).json({ ok: false, error: "room_load_failed" });
+    res.status(500).json({ ok: false, error: ROOM_ERROR_CODES.ROOM_LOAD_FAILED });
   }
 });
 
@@ -227,13 +231,13 @@ roomRoutes.patch("/:roomId", requireAuth, async (req, res) => {
   const roomId = normalizeRoomId(req.params.roomId);
 
   if (!roomId || !isValidRoomId(roomId)) {
-    res.status(400).json({ ok: false, error: "invalid_room_id" });
+    res.status(400).json({ ok: false, error: ROOM_ERROR_CODES.INVALID_ROOM_ID });
     return;
   }
 
   const roomName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
   if (!roomName) {
-    res.status(400).json({ ok: false, error: "invalid_room_name" });
+    res.status(400).json({ ok: false, error: ROOM_ERROR_CODES.INVALID_ROOM_NAME });
     return;
   }
 
@@ -246,26 +250,26 @@ roomRoutes.patch("/:roomId", requireAuth, async (req, res) => {
     res.json({ ok: true, room });
   } catch (error) {
     const code = error instanceof Error && "code" in error ? error.code : null;
-    if (code === "room_not_found") {
+    if (code === ROOM_ERROR_CODES.ROOM_NOT_FOUND) {
       res.status(404).json({ ok: false, error: code });
       return;
     }
-    if (code === "forbidden_room_owner_only") {
+    if (code === ROOM_ERROR_CODES.FORBIDDEN_ROOM_OWNER_ONLY) {
       res.status(403).json({ ok: false, error: code });
       return;
     }
-    if (code === "invalid_owner_id") {
+    if (code === ROOM_ERROR_CODES.INVALID_OWNER_ID) {
       res.status(400).json({ ok: false, error: code });
       return;
     }
 
     const message = error instanceof Error ? error.message : "Room rename failed.";
     if (message.includes("MONGODB_URI is required")) {
-      res.status(503).json({ ok: false, error: "db_not_configured" });
+      res.status(503).json({ ok: false, error: ROOM_ERROR_CODES.DB_NOT_CONFIGURED });
       return;
     }
 
-    res.status(500).json({ ok: false, error: "room_rename_failed" });
+    res.status(500).json({ ok: false, error: ROOM_ERROR_CODES.ROOM_RENAME_FAILED });
   }
 });
 
@@ -273,7 +277,7 @@ roomRoutes.delete("/:roomId", requireAuth, async (req, res) => {
   const roomId = normalizeRoomId(req.params.roomId);
 
   if (!roomId || !isValidRoomId(roomId)) {
-    res.status(400).json({ ok: false, error: "invalid_room_id" });
+    res.status(400).json({ ok: false, error: ROOM_ERROR_CODES.INVALID_ROOM_ID });
     return;
   }
 
@@ -285,26 +289,26 @@ roomRoutes.delete("/:roomId", requireAuth, async (req, res) => {
     res.json({ ok: true, roomId });
   } catch (error) {
     const code = error instanceof Error && "code" in error ? error.code : null;
-    if (code === "room_not_found") {
+    if (code === ROOM_ERROR_CODES.ROOM_NOT_FOUND) {
       res.status(404).json({ ok: false, error: code });
       return;
     }
-    if (code === "forbidden_room_owner_only") {
+    if (code === ROOM_ERROR_CODES.FORBIDDEN_ROOM_OWNER_ONLY) {
       res.status(403).json({ ok: false, error: code });
       return;
     }
-    if (code === "invalid_owner_id") {
+    if (code === ROOM_ERROR_CODES.INVALID_OWNER_ID) {
       res.status(400).json({ ok: false, error: code });
       return;
     }
 
     const message = error instanceof Error ? error.message : "Room archive failed.";
     if (message.includes("MONGODB_URI is required")) {
-      res.status(503).json({ ok: false, error: "db_not_configured" });
+      res.status(503).json({ ok: false, error: ROOM_ERROR_CODES.DB_NOT_CONFIGURED });
       return;
     }
 
-    res.status(500).json({ ok: false, error: "room_archive_failed" });
+    res.status(500).json({ ok: false, error: ROOM_ERROR_CODES.ROOM_ARCHIVE_FAILED });
   }
 });
 

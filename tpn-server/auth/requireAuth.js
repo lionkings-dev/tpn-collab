@@ -1,5 +1,6 @@
 import { getFirebaseAdminAuth, isFirebaseConfigured } from "./firebaseAdmin.js";
 import { upsertUserFromDecodedToken } from "./usersRepo.js";
+import { AUTH_ERROR_CODES } from "@tpn/contracts/error-codes";
 
 function getBearerToken(headerValue) {
   if (!headerValue) return null;
@@ -11,13 +12,13 @@ function getBearerToken(headerValue) {
 
 export async function requireAuth(req, res, next) {
   if (!isFirebaseConfigured()) {
-    res.status(503).json({ error: "auth_not_configured" });
+    res.status(503).json({ error: AUTH_ERROR_CODES.AUTH_NOT_CONFIGURED });
     return;
   }
 
   const bearerToken = getBearerToken(req.headers.authorization);
   if (!bearerToken) {
-    res.status(401).json({ error: "missing_bearer_token" });
+    res.status(401).json({ error: AUTH_ERROR_CODES.MISSING_BEARER_TOKEN });
     return;
   }
 
@@ -38,10 +39,10 @@ export async function requireAuth(req, res, next) {
       error instanceof Error ? error.message : "Token verification failed.";
 
     if (message.includes("MONGODB_URI is required")) {
-      res.status(503).json({ error: "db_not_configured" });
+      res.status(503).json({ error: AUTH_ERROR_CODES.DB_NOT_CONFIGURED });
       return;
     }
 
-    res.status(401).json({ error: "invalid_or_expired_token" });
+    res.status(401).json({ error: AUTH_ERROR_CODES.INVALID_OR_EXPIRED_TOKEN });
   }
 }

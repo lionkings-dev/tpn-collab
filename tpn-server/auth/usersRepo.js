@@ -1,4 +1,5 @@
 import { getCollection } from "../db/mongo.js";
+import { AUTH_PROVIDER } from "@tpn/contracts/auth-contracts";
 
 let indexesReady = false;
 
@@ -40,12 +41,12 @@ export async function upsertUserFromDecodedToken(decodedToken) {
 
   await users.updateOne(
     {
-      provider: "google",
+      provider: AUTH_PROVIDER.GOOGLE,
       providerId,
     },
     {
       $set: {
-        provider: "google",
+        provider: AUTH_PROVIDER.GOOGLE,
         providerId,
         email,
         displayName: decodedToken.name || email,
@@ -63,7 +64,7 @@ export async function upsertUserFromDecodedToken(decodedToken) {
   );
 
   const savedUser = await users.findOne({
-    provider: "google",
+    provider: AUTH_PROVIDER.GOOGLE,
     providerId,
   });
 

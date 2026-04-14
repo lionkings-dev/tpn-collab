@@ -1,5 +1,11 @@
 import { createHash, randomBytes } from "crypto";
 import { ObjectId } from "mongodb";
+import {
+  CLAIM_ROOM_STATUS,
+  ROOM_STATUS,
+  ROOM_VISIBILITY,
+} from "@tpn/contracts/room-contracts";
+import { ROOM_ERROR_CODES } from "@tpn/contracts/error-codes";
 
 import { getCollection } from "../db/mongo.js";
 
@@ -86,7 +92,7 @@ function hashClaimToken(token) {
 export async function roomExists(roomId) {
   const rooms = await getRoomsCollection();
   const room = await rooms.findOne(
-    { _id: roomId, status: { $ne: "archived" } },
+    { _id: roomId, status: { $ne: ROOM_STATUS.ARCHIVED } },
     { projection: { _id: 1 } },
   );
   return Boolean(room);
@@ -96,11 +102,11 @@ export async function getRoomById(roomId) {
   const rooms = await getRoomsCollection();
   const room = await rooms.findOne({
     _id: roomId,
-    status: { $ne: "archived" },
+    status: { $ne: ROOM_STATUS.ARCHIVED },
   });
 
   if (!room) {
-    throw buildError("room_not_found");
+    throw buildError(ROOM_ERROR_CODES.ROOM_NOT_FOUND);
   }
 
   return normalizeRoomDoc(room);
@@ -111,7 +117,7 @@ export async function getPublicRoomById(roomId) {
   const room = await rooms.findOne(
     {
       _id: roomId,
-      status: { $ne: "archived" },
+      status: { $ne: ROOM_STATUS.ARCHIVED },
     },
     {
       projection: { _id: 0, name: 1 },
@@ -119,7 +125,7 @@ export async function getPublicRoomById(roomId) {
   );
 
   if (!room) {
-    throw buildError("room_not_found");
+    throw buildError(ROOM_ERROR_CODES.ROOM_NOT_FOUND);
   }
 
   return {
@@ -132,20 +138,20 @@ export async function getOwnedRoomById({ roomId, ownerId }) {
   const ownerObjectId = toOwnerObjectId(ownerId);
 
   if (!ownerObjectId) {
-    throw buildError("invalid_owner_id");
+    throw buildError(ROOM_ERROR_CODES.INVALID_OWNER_ID);
   }
 
   const room = await rooms.findOne({
     _id: roomId,
-    status: { $ne: "archived" },
+    status: { $ne: ROOM_STATUS.ARCHIVED },
   });
 
   if (!room) {
-    throw buildError("room_not_found");
+    throw buildError(ROOM_ERROR_CODES.ROOM_NOT_FOUND);
   }
 
   if (!room.ownerId || String(room.ownerId) !== String(ownerObjectId)) {
-    throw buildError("forbidden_room_owner_only");
+    throw buildError(ROOM_ERROR_CODES.FORBIDDEN_ROOM_OWNER_ONLY);
   }
 
   return normalizeRoomDoc(room);
@@ -161,8 +167,8 @@ export async function registerRoom({ roomId, roomName, ownerId }) {
     _id: roomId,
     name: roomName || "Untitled Model",
     ownerId: ownerObjectId,
-    visibility: "private",
-    status: "active",
+    visibility: ROOM_VISIBILITY.PRIVATE,
+    status: ROOM_STATUS.ACTIVE,
     createdAt: now,
   };
 
@@ -200,11 +206,11 @@ export async function claimRoomOwnership({ roomId, ownerId, claimToken }) {
   const ownerObjectId = toOwnerObjectId(ownerId);
 
   if (!ownerObjectId) {
-    throw buildError("invalid_owner_id");
+    throw buildError(ROOM_ERROR_CODES.INVALID_OWNER_ID);
   }
 
   if (!claimToken?.trim()) {
-    throw buildError("claim_token_invalid_or_missing");
+    throw buildError(ROOM_ERROR_CODES.CLAIM_TOKEN_INVALID_OR_MISSING);
   }
 
   const claimTokenHash = hashClaimToken(claimToken.trim());
@@ -213,7 +219,7 @@ export async function claimRoomOwnership({ roomId, ownerId, claimToken }) {
     {
       _id: roomId,
       ownerId: null,
-      status: { $ne: "archived" },
+      status: { $ne: ROOM_STATUS.ARCHIVED },
       claimTokenHash,
     },
     {
@@ -233,30 +239,30 @@ export async function claimRoomOwnership({ roomId, ownerId, claimToken }) {
   if (claimResult.modifiedCount === 1) {
     const claimedRoom = await rooms.findOne({ _id: roomId });
     if (!claimedRoom) {
-      throw buildError("room_not_found");
+      throw buildError(ROOM_ERROR_CODES.ROOM_NOT_FOUND);
     }
     return {
       room: normalizeRoomDoc(claimedRoom),
-      claimStatus: "claimed",
+      claimStatus: CLAIM_ROOM_STATUS.CLAIMED,
     };
   }
 
   const existingRoom = await rooms.findOne({ _id: roomId });
-  if (!existingRoom || existingRoom.status === "archived") {
-    throw buildError("room_not_found");
+  if (!existingRoom || existingRoom.status === ROOM_STATUS.ARCHIVED) {
+    throw buildError(ROOM_ERROR_CODES.ROOM_NOT_FOUND);
   }
 
   if (existingRoom.ownerId) {
     if (String(existingRoom.ownerId) === String(ownerObjectId)) {
       return {
         room: normalizeRoomDoc(existingRoom),
-        claimStatus: "already_owned_by_you",
+        claimStatus: CLAIM_ROOM_STATUS.ALREADY_OWNED_BY_YOU,
       };
     }
-    throw buildError("room_already_claimed");
+    throw buildError(ROOM_ERROR_CODES.ROOM_ALREADY_CLAIMED);
   }
 
-  throw buildError("claim_token_invalid_or_missing");
+  throw buildError(ROOM_ERROR_CODES.CLAIM_TOKEN_INVALID_OR_MISSING);
 }
 
 export async function touchRoomLastAccessed(roomId) {
@@ -264,7 +270,7 @@ export async function touchRoomLastAccessed(roomId) {
   const result = await rooms.updateOne(
     {
       _id: roomId,
-      status: { $ne: "archived" },
+      status: { $ne: ROOM_STATUS.ARCHIVED },
     },
     {
       $set: {
@@ -281,14 +287,14 @@ export async function getOwnedRooms(ownerId) {
   const ownerObjectId = toOwnerObjectId(ownerId);
 
   if (!ownerObjectId) {
-    throw buildError("invalid_owner_id");
+    throw buildError(ROOM_ERROR_CODES.INVALID_OWNER_ID);
   }
 
   const result = await rooms
     .find(
       {
         ownerId: ownerObjectId,
-        status: { $ne: "archived" },
+        status: { $ne: ROOM_STATUS.ARCHIVED },
       },
       {
         sort: { updatedAt: -1 },
@@ -304,7 +310,7 @@ export async function renameOwnedRoom({ roomId, ownerId, name }) {
   const ownerObjectId = toOwnerObjectId(ownerId);
 
   if (!ownerObjectId) {
-    throw buildError("invalid_owner_id");
+    throw buildError(ROOM_ERROR_CODES.INVALID_OWNER_ID);
   }
 
   const now = new Date();
@@ -314,7 +320,7 @@ export async function renameOwnedRoom({ roomId, ownerId, name }) {
     {
       _id: roomId,
       ownerId: ownerObjectId,
-      status: { $ne: "archived" },
+      status: { $ne: ROOM_STATUS.ARCHIVED },
     },
     {
       $set: {
@@ -332,15 +338,15 @@ export async function renameOwnedRoom({ roomId, ownerId, name }) {
   }
 
   const existingRoom = await rooms.findOne({ _id: roomId });
-  if (!existingRoom || existingRoom.status === "archived") {
-    throw buildError("room_not_found");
+  if (!existingRoom || existingRoom.status === ROOM_STATUS.ARCHIVED) {
+    throw buildError(ROOM_ERROR_CODES.ROOM_NOT_FOUND);
   }
 
   if (!existingRoom.ownerId || String(existingRoom.ownerId) !== String(ownerObjectId)) {
-    throw buildError("forbidden_room_owner_only");
+    throw buildError(ROOM_ERROR_CODES.FORBIDDEN_ROOM_OWNER_ONLY);
   }
 
-  throw buildError("room_rename_failed");
+  throw buildError(ROOM_ERROR_CODES.ROOM_RENAME_FAILED);
 }
 
 export async function archiveOwnedRoom({ roomId, ownerId }) {
@@ -348,7 +354,7 @@ export async function archiveOwnedRoom({ roomId, ownerId }) {
   const ownerObjectId = toOwnerObjectId(ownerId);
 
   if (!ownerObjectId) {
-    throw buildError("invalid_owner_id");
+    throw buildError(ROOM_ERROR_CODES.INVALID_OWNER_ID);
   }
 
   const now = new Date();
@@ -357,11 +363,11 @@ export async function archiveOwnedRoom({ roomId, ownerId }) {
     {
       _id: roomId,
       ownerId: ownerObjectId,
-      status: { $ne: "archived" },
+      status: { $ne: ROOM_STATUS.ARCHIVED },
     },
     {
       $set: {
-        status: "archived",
+        status: ROOM_STATUS.ARCHIVED,
         updatedAt: now,
       },
     },
@@ -372,15 +378,15 @@ export async function archiveOwnedRoom({ roomId, ownerId }) {
   }
 
   const existingRoom = await rooms.findOne({ _id: roomId });
-  if (!existingRoom || existingRoom.status === "archived") {
-    throw buildError("room_not_found");
+  if (!existingRoom || existingRoom.status === ROOM_STATUS.ARCHIVED) {
+    throw buildError(ROOM_ERROR_CODES.ROOM_NOT_FOUND);
   }
 
   if (!existingRoom.ownerId || String(existingRoom.ownerId) !== String(ownerObjectId)) {
-    throw buildError("forbidden_room_owner_only");
+    throw buildError(ROOM_ERROR_CODES.FORBIDDEN_ROOM_OWNER_ONLY);
   }
 
-  throw buildError("room_archive_failed");
+  throw buildError(ROOM_ERROR_CODES.ROOM_ARCHIVE_FAILED);
 }
 
 export async function findIdleOwnerlessActiveRooms({
@@ -395,7 +401,7 @@ export async function findIdleOwnerlessActiveRooms({
   const result = await rooms
     .find(
       {
-        status: "active",
+        status: ROOM_STATUS.ACTIVE,
         ownerId: null,
         lastAccessedAt: { $lte: idleBefore },
       },
@@ -423,12 +429,12 @@ export async function archiveOwnerlessRoomsByIds(roomIds) {
   const result = await rooms.updateMany(
     {
       _id: { $in: roomIds },
-      status: "active",
+      status: ROOM_STATUS.ACTIVE,
       ownerId: null,
     },
     {
       $set: {
-        status: "archived",
+        status: ROOM_STATUS.ARCHIVED,
         updatedAt: now,
       },
     },

@@ -1,4 +1,4 @@
-const ROOM_ID_REGEX = /^[a-z0-9][a-z0-9-]{5,63}$/;
+import { isValidRoomId, normalizeRoomId } from "@tpn/contracts/room-id";
 
 const ADJECTIVES = [
   "amber",
@@ -52,10 +52,6 @@ export function generateRoomName(roomId?: string): string {
   return `Room ${new Date().toLocaleString()}`;
 }
 
-export function isValidRoomId(roomId: string): boolean {
-  return ROOM_ID_REGEX.test(roomId);
-}
-
 export function extractRoomIdFromInvite(input: string): string | null {
   const raw = input.trim();
   if (!raw) return null;
@@ -78,5 +74,7 @@ export function extractRoomIdFromInvite(input: string): string | null {
 export function normalizeRoomInput(input: string): string | null {
   const extracted = extractRoomIdFromInvite(input);
   if (!extracted) return null;
-  return extracted.trim().toLowerCase();
+  return normalizeRoomId(extracted);
 }
+
+export { isValidRoomId };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { ROOM_ERROR_CODES } from "@tpn/contracts/error-codes";
 
 import type { ToastType } from "../../../components/panels/toastPopup";
 import { firebaseAuth } from "../../../lib/firebase";
@@ -75,13 +76,13 @@ export function useEditorAuthActions({
     } catch (error) {
       if (!(error instanceof Error)) return;
 
-      if (error.message === "room_already_claimed") {
+      if (error.message === ROOM_ERROR_CODES.ROOM_ALREADY_CLAIMED) {
         clearRoomClaimToken(activeRoomId);
         notify("This room is already owned by another account.", "info");
         return;
       }
 
-      if (error.message === "claim_token_invalid_or_missing") {
+      if (error.message === ROOM_ERROR_CODES.CLAIM_TOKEN_INVALID_OR_MISSING) {
         notify("Ownership key is missing or invalid on this device.", "info");
       }
     }

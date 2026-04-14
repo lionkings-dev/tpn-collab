@@ -2,16 +2,22 @@
   "name": "tpn-collab-repo",
   "private": true,
   "version": "1.0.0",
+  "workspaces": [
+    "tpn",
+    "tpn-server",
+    "packages/*"
+  ],
   "scripts": {
-    "install:frontend": "npm --prefix tpn install",
-    "install:backend": "npm --prefix tpn-server install",
-    "install:all": "npm run install:frontend && npm run install:backend",
-    "dev:frontend": "npm --prefix tpn run dev",
-    "dev:backend": "npm --prefix tpn-server run dev",
+    "install:frontend": "npm install --workspace tpn",
+    "install:backend": "npm install --workspace tpn-server",
+    "install:all": "npm install",
+    "dev:frontend": "npm run dev --workspace tpn",
+    "dev:backend": "npm run dev --workspace tpn-server",
     "dev": "bash -c 'npm run dev:backend & npm run dev:frontend & wait'",
-    "build:frontend": "npm --prefix tpn run build",
-    "test:frontend": "npm --prefix tpn run test:unit",
-    "test:backend": "npm --prefix tpn-server run test:day1 && npm --prefix tpn-server run test:day2 && npm --prefix tpn-server run test:day3",
+    "start:backend": "npm run start --workspace tpn-server",
+    "build:frontend": "npm run build --workspace tpn",
+    "test:frontend": "npm run test:unit --workspace tpn",
+    "test:backend": "npm run test:day1 --workspace tpn-server && npm run test:day2 --workspace tpn-server && npm run test:day3 --workspace tpn-server",
     "test": "npm run test:frontend && npm run test:backend"
   }
 }
