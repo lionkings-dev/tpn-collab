@@ -15,9 +15,17 @@
     "dev:backend": "npm run dev --workspace tpn-server",
     "dev": "bash -c 'npm run dev:backend & npm run dev:frontend & wait'",
     "start:backend": "npm run start --workspace tpn-server",
+    "build": "npm run build:frontend",
     "build:frontend": "npm run build --workspace tpn",
+    "typecheck": "npm run typecheck:frontend",
+    "typecheck:frontend": "npm run typecheck --workspace tpn",
+    "lint": "npm run lint:frontend && npm run lint:backend && npm run lint:contracts",
+    "lint:frontend": "npm run lint --workspace tpn",
+    "lint:backend": "npm run lint --workspace tpn-server --if-present",
+    "lint:contracts": "npm run lint --workspace @tpn/contracts --if-present",
     "test:frontend": "npm run test:unit --workspace tpn",
     "test:backend": "npm run test:day1 --workspace tpn-server && npm run test:day2 --workspace tpn-server && npm run test:day3 --workspace tpn-server",
+    "test:contracts": "npm run test --workspace @tpn/contracts --if-present",
     "test": "npm run test:frontend && npm run test:backend"
   }
 }

@@ -53,10 +53,19 @@ npm run dev:frontend
 - `npm run dev:backend`: run backend only
 - `npm run dev:frontend`: run frontend only
 - `npm run start:backend`: start backend in production mode
+- `npm run build`: build workspace apps (currently frontend)
 - `npm run build:frontend`: build frontend app
+- `npm run typecheck`: run workspace type checks
+- `npm run lint`: run workspace lint checks (frontend + optional package scripts)
 - `npm run test:frontend`: run frontend unit tests
 - `npm run test:backend`: run backend day1/day2/day3 smoke scripts
 - `npm run test`: run frontend + backend test suites
+
+## Workspace Rules
+
+- Use the root `package-lock.json` as the single lockfile.
+- Run installs from repo root (`npm install`).
+- Backend dev watcher includes `packages/contracts/src` changes via `tpn-server/nodemon.json`.
 
 ## Architecture Notes
 
