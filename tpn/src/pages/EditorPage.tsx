@@ -20,7 +20,6 @@ import {
   getFormatById,
   importGraph,
   listExportFormats,
-  listImportFormats,
   type FormatId,
 } from "../features/export";
 import { useToastState } from "../features/editor/hooks/useToastState";
@@ -40,8 +39,6 @@ import { nodeTypes, edgeTypes } from "../flow-config";
 type RoomRouteState = {
   roomName?: string;
 };
-
-type ImportFormatId = FormatId | "auto";
 
 const FULL_SCREEN_EDITOR_STYLE = {
   width: "100vw",
@@ -75,10 +72,6 @@ export default function EditorPage() {
   // Cross-cutting UI feedback state.
   const { toast, notify, closeToast } = useToastState();
   const [isSavePromptOpen, setIsSavePromptOpen] = useState(false);
-  const [selectedExportFormat, setSelectedExportFormat] =
-    useState<FormatId>("pnml");
-  const [selectedImportFormat, setSelectedImportFormat] =
-    useState<ImportFormatId>("auto");
 
   // Root editor element used for pointer-to-canvas projection.
   const editorRef = useRef<HTMLDivElement | null>(null);
@@ -229,13 +222,6 @@ export default function EditorPage() {
   }, [logout]);
 
   const exportFormats = useMemo(() => listExportFormats(), []);
-  const importFormats = useMemo(
-    () => [
-      { id: "auto" as const, label: "Auto" },
-      ...listImportFormats(),
-    ],
-    [],
-  );
 
   const handleExport = useCallback((formatId: FormatId) => {
     try {
@@ -264,19 +250,18 @@ export default function EditorPage() {
 
   const handleImport = useCallback(
     async (file: File) => {
+      let resolvedFormatId: FormatId | null = null;
+
       try {
         const content = await file.text();
-        const resolvedFormatId =
-          selectedImportFormat === "auto"
-            ? detectImportFormat(content, file.name)
-            : selectedImportFormat;
+        resolvedFormatId = detectImportFormat(content, file.name);
 
         if (!resolvedFormatId) {
           throw new Error("import_format_not_detected");
         }
 
         const importedGraph = importGraph(content, {
-          formatId: selectedImportFormat,
+          formatId: "auto",
           fileName: file.name,
         });
         replaceGraph(importedGraph.nodes, importedGraph.edges);
@@ -285,11 +270,31 @@ export default function EditorPage() {
           `${format.label} imported: ${importedGraph.nodes.length} nodes, ${importedGraph.edges.length} arcs.`,
           "success",
         );
-      } catch {
-        notify("Import failed. Please upload a valid file for the selected format.", "error");
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "import_format_not_detected"
+        ) {
+          notify(
+            "Import format not detected. Upload PNML (.pnml/.xml) or PPP (.ppp/.spec/.txt).",
+            "error",
+          );
+          return;
+        }
+
+        if (resolvedFormatId) {
+          const format = getFormatById(resolvedFormatId);
+          notify(
+            `${format.label} import failed. Please verify file content and retry.`,
+            "error",
+          );
+          return;
+        }
+
+        notify("Import failed. Please upload a valid PNML or PPP file.", "error");
       }
     },
-    [notify, replaceGraph, selectedImportFormat],
+    [notify, replaceGraph],
   );
 
   if (isCheckingRoom || !isRoomAllowed) {
@@ -336,12 +341,7 @@ export default function EditorPage() {
           onOpenSavePrompt={handleOpenSavePrompt}
           onNotify={notify}
           exportFormats={exportFormats}
-          selectedExportFormat={selectedExportFormat}
-          onExportFormatChange={setSelectedExportFormat}
           onExport={handleExport}
-          importFormats={importFormats}
-          selectedImportFormat={selectedImportFormat}
-          onImportFormatChange={setSelectedImportFormat}
           onImportFile={handleImport}
           currentUserName={authDisplayName}
           isAuthenticated={isAuthenticated}

@@ -306,6 +306,20 @@ export function importPpp(content: string): GraphImportResult {
     return [...inputLinks, ...outputLinks];
   });
 
+  const orderHint = new Map<string, number>();
+
+  placeNames.forEach((placeName, index) => {
+    const placeId = placeIdByName.get(placeName);
+    if (!placeId) return;
+    orderHint.set(placeId, index);
+  });
+
+  transitionNames.forEach((transitionName, index) => {
+    const transitionId = transitionIdByName.get(transitionName);
+    if (!transitionId) return;
+    orderHint.set(transitionId, placeNames.length + index);
+  });
+
   const positions = computeClusteredBipartiteLayout(layoutNodes, layoutLinks, {
     startX: 140,
     startY: 120,
@@ -313,6 +327,7 @@ export function importPpp(content: string): GraphImportResult {
     rowGap: 150,
     componentGapX: 260,
     componentGapY: 220,
+    orderHint,
   });
 
   const tokenSet = new Set(tokenNames);

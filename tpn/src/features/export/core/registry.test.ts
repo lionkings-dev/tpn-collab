@@ -62,6 +62,12 @@ describe("export format registry", () => {
     );
   });
 
+  it("falls back to filename extension when content is ambiguous", () => {
+    expect(detectImportFormat("graph export", "sample.spec")).toBe("ppp");
+    expect(detectImportFormat("graph export", "sample.xml")).toBe("pnml");
+    expect(detectImportFormat("graph export", "sample.unknown")).toBeNull();
+  });
+
   it("dispatches export and import through registry", () => {
     const pnml = exportGraph("pnml", {
       roomId: "room-1",
@@ -91,5 +97,14 @@ describe("export format registry", () => {
 
     const importedAuto = importGraph(ppp, { formatId: "auto", fileName: "graph.ppp" });
     expect(importedAuto.nodes).toHaveLength(2);
+  });
+
+  it("throws when auto import format cannot be detected", () => {
+    expect(() =>
+      importGraph("not pnml and not ppp", {
+        formatId: "auto",
+        fileName: "mystery.bin",
+      }),
+    ).toThrowError("import_format_not_detected");
   });
 });

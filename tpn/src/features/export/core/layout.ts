@@ -56,52 +56,178 @@ type ComputeClusteredBipartiteLayoutOptions = {
   componentGapX?: number;
   componentGapY?: number;
   maxRowWidth?: number;
+  orderHint?: ReadonlyMap<string, number>;
 };
 
-function connectedComponents(nodeIds: string[], links: LayoutLink[]) {
-  const adjacency = new Map<string, Set<string>>();
-  nodeIds.forEach((id) => adjacency.set(id, new Set()));
+function compareIds(
+  left: string,
+  right: string,
+  orderHint?: ReadonlyMap<string, number>,
+) {
+  const leftRank = orderHint?.get(left);
+  const rightRank = orderHint?.get(right);
 
-  links.forEach(({ sourceId, targetId }) => {
-    if (!adjacency.has(sourceId) || !adjacency.has(targetId)) return;
-    adjacency.get(sourceId)?.add(targetId);
-    adjacency.get(targetId)?.add(sourceId);
-  });
+  if (leftRank !== undefined && rightRank !== undefined && leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
 
+  if (leftRank !== undefined && rightRank === undefined) {
+    return -1;
+  }
+
+  if (leftRank === undefined && rightRank !== undefined) {
+    return 1;
+  }
+
+  return left.localeCompare(right);
+}
+
+function sortIds(ids: string[], orderHint?: ReadonlyMap<string, number>) {
+  return ids.slice().sort((a, b) => compareIds(a, b, orderHint));
+}
+
+function connectedComponents(
+  nodeIds: string[],
+  adjacency: Map<string, Set<string>>,
+  orderHint?: ReadonlyMap<string, number>,
+) {
+  const orderedNodeIds = sortIds(nodeIds, orderHint);
   const visited = new Set<string>();
   const components: string[][] = [];
 
-  nodeIds
-    .slice()
-    .sort((a, b) => a.localeCompare(b))
-    .forEach((startId) => {
-      if (visited.has(startId)) return;
+  orderedNodeIds.forEach((startId) => {
+    if (visited.has(startId)) return;
 
-      const queue: string[] = [startId];
-      const component: string[] = [];
-      visited.add(startId);
+    const queue: string[] = [startId];
+    const component: string[] = [];
+    visited.add(startId);
 
-      while (queue.length > 0) {
-        const currentId = queue.shift();
-        if (!currentId) continue;
-        component.push(currentId);
+    for (let index = 0; index < queue.length; index += 1) {
+      const currentId = queue[index];
+      component.push(currentId);
 
-        const neighbors = adjacency.get(currentId);
-        if (!neighbors) continue;
+      const neighbors = adjacency.get(currentId);
+      if (!neighbors) continue;
 
-        Array.from(neighbors)
-          .sort((a, b) => a.localeCompare(b))
-          .forEach((neighborId) => {
-            if (visited.has(neighborId)) return;
-            visited.add(neighborId);
-            queue.push(neighborId);
-          });
-      }
+      sortIds(Array.from(neighbors), orderHint).forEach((neighborId) => {
+        if (visited.has(neighborId)) return;
+        visited.add(neighborId);
+        queue.push(neighborId);
+      });
+    }
 
-      components.push(component);
-    });
+    components.push(component);
+  });
 
   return components;
+}
+
+function choosePivotNode(
+  componentNodeIds: string[],
+  nodeKindById: Map<string, LayoutNodeKind>,
+  outgoingCount: Map<string, number>,
+  incomingCount: Map<string, number>,
+  orderHint?: ReadonlyMap<string, number>,
+) {
+  const placeIds = componentNodeIds.filter((id) => nodeKindById.get(id) === "place");
+  const candidates = placeIds.length > 0 ? placeIds : componentNodeIds;
+
+  const sortedCandidates = candidates.slice().sort((left, right) => {
+    const leftScore = (outgoingCount.get(left) ?? 0) - (incomingCount.get(left) ?? 0);
+    const rightScore =
+      (outgoingCount.get(right) ?? 0) - (incomingCount.get(right) ?? 0);
+    if (leftScore !== rightScore) return rightScore - leftScore;
+
+    const leftIncoming = incomingCount.get(left) ?? 0;
+    const rightIncoming = incomingCount.get(right) ?? 0;
+    if (leftIncoming !== rightIncoming) return leftIncoming - rightIncoming;
+
+    return compareIds(left, right, orderHint);
+  });
+
+  return sortedCandidates[0] ?? componentNodeIds[0];
+}
+
+function computeDepthsFromPivot(
+  pivotId: string,
+  adjacency: Map<string, Set<string>>,
+  orderHint?: ReadonlyMap<string, number>,
+) {
+  const depths = new Map<string, number>([[pivotId, 0]]);
+  const queue: string[] = [pivotId];
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const currentId = queue[index];
+    const currentDepth = depths.get(currentId) ?? 0;
+    const neighbors = adjacency.get(currentId);
+    if (!neighbors) continue;
+
+    sortIds(Array.from(neighbors), orderHint).forEach((neighborId) => {
+      if (depths.has(neighborId)) return;
+      depths.set(neighborId, currentDepth + 1);
+      queue.push(neighborId);
+    });
+  }
+
+  return depths;
+}
+
+function sortColumnByNeighbors(
+  columnIds: string[],
+  neighborColumnSet: Set<string>,
+  adjacency: Map<string, Set<string>>,
+  neighborIndexById: Map<string, number>,
+  outgoingCount: Map<string, number>,
+  incomingCount: Map<string, number>,
+  orderHint?: ReadonlyMap<string, number>,
+) {
+  const barycenterById = new Map<string, number>();
+
+  columnIds.forEach((id) => {
+    const neighbors = adjacency.get(id);
+    if (!neighbors) {
+      barycenterById.set(id, Number.POSITIVE_INFINITY);
+      return;
+    }
+
+    const anchorIndexes = Array.from(neighbors)
+      .filter((neighborId) => neighborColumnSet.has(neighborId))
+      .map((neighborId) => neighborIndexById.get(neighborId))
+      .filter((index): index is number => index !== undefined);
+
+    if (anchorIndexes.length === 0) {
+      barycenterById.set(id, Number.POSITIVE_INFINITY);
+      return;
+    }
+
+    const sum = anchorIndexes.reduce((acc, index) => acc + index, 0);
+    barycenterById.set(id, sum / anchorIndexes.length);
+  });
+
+  return columnIds.slice().sort((left, right) => {
+    const leftBarycenter = barycenterById.get(left) ?? Number.POSITIVE_INFINITY;
+    const rightBarycenter = barycenterById.get(right) ?? Number.POSITIVE_INFINITY;
+
+    const leftFinite = Number.isFinite(leftBarycenter);
+    const rightFinite = Number.isFinite(rightBarycenter);
+
+    if (leftFinite && rightFinite && leftBarycenter !== rightBarycenter) {
+      return leftBarycenter - rightBarycenter;
+    }
+
+    if (leftFinite !== rightFinite) {
+      return leftFinite ? -1 : 1;
+    }
+
+    const leftScore = (outgoingCount.get(left) ?? 0) - (incomingCount.get(left) ?? 0);
+    const rightScore =
+      (outgoingCount.get(right) ?? 0) - (incomingCount.get(right) ?? 0);
+    if (leftScore !== rightScore) {
+      return rightScore - leftScore;
+    }
+
+    return compareIds(left, right, orderHint);
+  });
 }
 
 export function computeClusteredBipartiteLayout(
@@ -115,6 +241,7 @@ export function computeClusteredBipartiteLayout(
     componentGapX = 240,
     componentGapY = 220,
     maxRowWidth = 2400,
+    orderHint,
   }: ComputeClusteredBipartiteLayoutOptions = {},
 ) {
   const positions = new Map<string, Point>();
@@ -126,60 +253,129 @@ export function computeClusteredBipartiteLayout(
   const nodeIds = nodes.map((node) => node.id);
   const outgoingCount = new Map<string, number>();
   const incomingCount = new Map<string, number>();
+  const undirectedAdjacency = new Map<string, Set<string>>();
 
   nodeIds.forEach((id) => {
     outgoingCount.set(id, 0);
     incomingCount.set(id, 0);
+    undirectedAdjacency.set(id, new Set());
   });
 
   links.forEach(({ sourceId, targetId }) => {
     if (!outgoingCount.has(sourceId) || !incomingCount.has(targetId)) return;
+
     outgoingCount.set(sourceId, (outgoingCount.get(sourceId) ?? 0) + 1);
     incomingCount.set(targetId, (incomingCount.get(targetId) ?? 0) + 1);
+
+    undirectedAdjacency.get(sourceId)?.add(targetId);
+    undirectedAdjacency.get(targetId)?.add(sourceId);
   });
 
-  const components = connectedComponents(nodeIds, links).sort((a, b) => {
-    const aKey = a.slice().sort((x, y) => x.localeCompare(y))[0] ?? "";
-    const bKey = b.slice().sort((x, y) => x.localeCompare(y))[0] ?? "";
-    return aKey.localeCompare(bKey);
-  });
+  const components = connectedComponents(nodeIds, undirectedAdjacency, orderHint).sort(
+    (left, right) => {
+      const leftKey = sortIds(left, orderHint)[0] ?? "";
+      const rightKey = sortIds(right, orderHint)[0] ?? "";
+      return compareIds(leftKey, rightKey, orderHint);
+    },
+  );
 
   let cursorX = startX;
   let cursorY = startY;
   let rowMaxHeight = 0;
 
   components.forEach((componentNodeIds) => {
-    const leftPlaces: string[] = [];
-    const rightPlaces: string[] = [];
-    const transitions: string[] = [];
+    const orderedComponentNodeIds = sortIds(componentNodeIds, orderHint);
+    const componentSet = new Set(orderedComponentNodeIds);
 
-    componentNodeIds
-      .slice()
-      .sort((a, b) => a.localeCompare(b))
-      .forEach((id) => {
-        const kind = nodeKindById.get(id);
-        if (kind === "transition") {
-          transitions.push(id);
-          return;
-        }
+    const componentAdjacency = new Map<string, Set<string>>();
+    orderedComponentNodeIds.forEach((id) => {
+      const neighbors = undirectedAdjacency.get(id) ?? new Set<string>();
+      componentAdjacency.set(
+        id,
+        new Set(
+          Array.from(neighbors).filter((neighborId) => componentSet.has(neighborId)),
+        ),
+      );
+    });
 
-        if (kind === "place") {
-          const outgoing = outgoingCount.get(id) ?? 0;
-          const incoming = incomingCount.get(id) ?? 0;
-          if (outgoing >= incoming) {
-            leftPlaces.push(id);
-          } else {
-            rightPlaces.push(id);
-          }
-        }
-      });
+    const pivotId = choosePivotNode(
+      orderedComponentNodeIds,
+      nodeKindById,
+      outgoingCount,
+      incomingCount,
+      orderHint,
+    );
 
-    const hasLeft = leftPlaces.length > 0;
-    const hasRight = rightPlaces.length > 0;
-    const maxRows = Math.max(leftPlaces.length, transitions.length, rightPlaces.length, 1);
+    const depths = computeDepthsFromPivot(pivotId, componentAdjacency, orderHint);
+
+    const columns = new Map<number, string[]>();
+    orderedComponentNodeIds.forEach((id) => {
+      const depth = depths.get(id) ?? 0;
+      const column = columns.get(depth) ?? [];
+      column.push(id);
+      columns.set(depth, column);
+    });
+
+    const sortedDepths = Array.from(columns.keys()).sort((a, b) => a - b);
+
+    sortedDepths.forEach((depth) => {
+      columns.set(depth, sortIds(columns.get(depth) ?? [], orderHint));
+    });
+
+    for (let depthIndex = 1; depthIndex < sortedDepths.length; depthIndex += 1) {
+      const depth = sortedDepths[depthIndex];
+      const previousDepth = sortedDepths[depthIndex - 1];
+      const column = columns.get(depth) ?? [];
+      const previousColumn = columns.get(previousDepth) ?? [];
+
+      const previousIndexById = new Map(
+        previousColumn.map((id, index) => [id, index]),
+      );
+
+      columns.set(
+        depth,
+        sortColumnByNeighbors(
+          column,
+          new Set(previousColumn),
+          componentAdjacency,
+          previousIndexById,
+          outgoingCount,
+          incomingCount,
+          orderHint,
+        ),
+      );
+    }
+
+    for (let depthIndex = sortedDepths.length - 2; depthIndex >= 0; depthIndex -= 1) {
+      const depth = sortedDepths[depthIndex];
+      const nextDepth = sortedDepths[depthIndex + 1];
+      const column = columns.get(depth) ?? [];
+      const nextColumn = columns.get(nextDepth) ?? [];
+
+      const nextIndexById = new Map(nextColumn.map((id, index) => [id, index]));
+
+      columns.set(
+        depth,
+        sortColumnByNeighbors(
+          column,
+          new Set(nextColumn),
+          componentAdjacency,
+          nextIndexById,
+          outgoingCount,
+          incomingCount,
+          orderHint,
+        ),
+      );
+    }
+
+    const maxRows = Math.max(
+      1,
+      ...Array.from(columns.values()).map((column) => column.length),
+    );
+    const minDepth = sortedDepths[0] ?? 0;
+    const maxDepth = sortedDepths[sortedDepths.length - 1] ?? 0;
     const componentHeight = Math.max(0, (maxRows - 1) * rowGap);
-    const columnCount = hasLeft && hasRight ? 3 : 2;
-    const componentWidth = Math.max(0, (columnCount - 1) * columnGap);
+    const componentWidth = Math.max(0, (maxDepth - minDepth) * columnGap);
 
     if (cursorX > startX && cursorX + componentWidth > startX + maxRowWidth) {
       cursorX = startX;
@@ -187,32 +383,15 @@ export function computeClusteredBipartiteLayout(
       rowMaxHeight = 0;
     }
 
-    const transitionX = hasLeft ? cursorX + columnGap : cursorX;
-    const leftX = hasLeft ? cursorX : transitionX - columnGap;
-    const rightX = hasRight ? transitionX + columnGap : transitionX + columnGap;
+    sortedDepths.forEach((depth) => {
+      const column = columns.get(depth) ?? [];
+      const verticalOffset = ((maxRows - column.length) * rowGap) / 2;
 
-    const placeLeftOffset = ((maxRows - leftPlaces.length) * rowGap) / 2;
-    const transitionOffset = ((maxRows - transitions.length) * rowGap) / 2;
-    const placeRightOffset = ((maxRows - rightPlaces.length) * rowGap) / 2;
-
-    leftPlaces.forEach((id, index) => {
-      positions.set(id, {
-        x: leftX,
-        y: cursorY + placeLeftOffset + index * rowGap,
-      });
-    });
-
-    transitions.forEach((id, index) => {
-      positions.set(id, {
-        x: transitionX,
-        y: cursorY + transitionOffset + index * rowGap,
-      });
-    });
-
-    rightPlaces.forEach((id, index) => {
-      positions.set(id, {
-        x: rightX,
-        y: cursorY + placeRightOffset + index * rowGap,
+      column.forEach((id, rowIndex) => {
+        positions.set(id, {
+          x: cursorX + (depth - minDepth) * columnGap,
+          y: cursorY + verticalOffset + rowIndex * rowGap,
+        });
       });
     });
 

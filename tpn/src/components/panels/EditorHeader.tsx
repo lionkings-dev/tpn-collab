@@ -1,13 +1,8 @@
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Panel } from "@xyflow/react";
 import "./EditorHeader.css";
 import type { ToastType } from "./toastPopup";
 import type { ExportFormatOption, FormatId } from "../../features/export";
-
-type ImportFormatOption = {
-  id: FormatId | "auto";
-  label: string;
-};
 
 type EditorHeaderProps = {
   roomId: string;
@@ -15,12 +10,7 @@ type EditorHeaderProps = {
   onOpenSavePrompt: () => void;
   onNotify: (message: string, type?: ToastType) => void;
   exportFormats: ExportFormatOption[];
-  selectedExportFormat: FormatId;
-  onExportFormatChange: (formatId: FormatId) => void;
   onExport: (formatId: FormatId) => void;
-  importFormats: ImportFormatOption[];
-  selectedImportFormat: FormatId | "auto";
-  onImportFormatChange: (formatId: FormatId | "auto") => void;
   onImportFile: (file: File) => void | Promise<void>;
   currentUserName: string | null;
   isAuthenticated: boolean;
@@ -35,12 +25,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   onOpenSavePrompt,
   onNotify,
   exportFormats,
-  selectedExportFormat,
-  onExportFormatChange,
   onExport,
-  importFormats,
-  selectedImportFormat,
-  onImportFormatChange,
   onImportFile,
   currentUserName,
   isAuthenticated,
@@ -49,6 +34,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   onLogout,
 }) => {
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [exportSelection, setExportSelection] = useState<FormatId | "">("");
 
   const handleInvite = () => {
     const inviteLink = `${window.location.origin}/room/${roomId}`;
@@ -101,6 +87,18 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
     [onImportFile, onNotify],
   );
 
+  const handleExportSelection = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const formatId = event.target.value as FormatId | "";
+      setExportSelection(formatId);
+      if (!formatId) return;
+
+      onExport(formatId);
+      setExportSelection("");
+    },
+    [onExport],
+  );
+
   return (
     <Panel position="top-left" className="editor-header">
       <span className="room-name">{roomName}</span>
@@ -108,26 +106,12 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
       <button onClick={onOpenSavePrompt}>Rename Room</button>
       <select
         className="editor-format-select"
-        value={selectedExportFormat}
-        onChange={(event) => onExportFormatChange(event.target.value as FormatId)}
-        aria-label="Select export format"
+        value={exportSelection}
+        onChange={handleExportSelection}
+        aria-label="Export graph format"
       >
+        <option value="">Export...</option>
         {exportFormats.map((format) => (
-          <option key={format.id} value={format.id}>
-            {format.label}
-          </option>
-        ))}
-      </select>
-      <button onClick={() => onExport(selectedExportFormat)}>Export</button>
-      <select
-        className="editor-format-select"
-        value={selectedImportFormat}
-        onChange={(event) =>
-          onImportFormatChange(event.target.value as FormatId | "auto")
-        }
-        aria-label="Select import format"
-      >
-        {importFormats.map((format) => (
           <option key={format.id} value={format.id}>
             {format.label}
           </option>
