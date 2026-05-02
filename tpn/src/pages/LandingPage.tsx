@@ -191,16 +191,16 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="landing-container">
-      <header className="landing-header">
-        <div className="logo">TPN-Collab</div>
-        <nav className="main-nav">
+      <header className="landing-header ui-page-shell">
+        <div className="logo">TPN Collab</div>
+        <nav className="main-nav" aria-label="Account actions">
           {isAuthenticated ? (
             <>
               <span className="nav-user-name" title={authName}>
                 {authName}
               </span>
               <button
-                className="nav-button"
+                className="ui-button ui-button-ghost"
                 onClick={() => {
                   navigate("/rooms");
                 }}
@@ -208,7 +208,7 @@ const LandingPage: React.FC = () => {
                 My Rooms
               </button>
               <button
-                className="nav-button"
+                className="ui-button ui-button-secondary"
                 onClick={() => {
                   void handleSignOut();
                 }}
@@ -219,7 +219,7 @@ const LandingPage: React.FC = () => {
             </>
           ) : (
             <button
-              className="nav-button signup"
+              className="ui-button ui-button-primary"
               onClick={() => {
                 void handleSignIn();
               }}
@@ -232,7 +232,8 @@ const LandingPage: React.FC = () => {
       </header>
 
       <main className="landing-main">
-        <div className="landing-box">
+        <div className="landing-box ui-card">
+          <span className="landing-chip">Collaborative modeling</span>
           <h1 className="landing-title">
             Timed Petri Net Collaborative Editor
           </h1>
@@ -241,7 +242,7 @@ const LandingPage: React.FC = () => {
             instantly.
           </p>
           <button
-            className="landing-button"
+            className="ui-button ui-button-primary landing-button"
             onClick={() => {
               void handleCreateModel();
             }}
@@ -256,13 +257,13 @@ const LandingPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="Enter Room ID..."
-                className={`room-id-input ${joinError ? "input-error" : ""}`}
+                className={`ui-control room-id-input ${joinError ? "is-invalid" : ""}`}
                 value={joinInput}
                 onChange={handleJoinInputChange}
                 onKeyDown={handleJoinKeyDown}
               />
               <button
-                className="join-button"
+                className="ui-button ui-button-secondary join-button"
                 onClick={() => {
                   void handleJoinRoom();
                 }}

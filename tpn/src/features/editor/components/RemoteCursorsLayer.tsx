@@ -49,15 +49,16 @@ export default function RemoteCursorsLayer({
                 height: 10,
                 borderRadius: 999,
                 backgroundColor: remoteUser.user.color,
-                boxShadow: "0 0 0 2px rgba(0, 0, 0, 0.35)",
+                boxShadow: "0 0 0 2px rgba(255, 255, 255, 0.85)",
               }}
             />
             <span
               style={{
-                padding: "0.1rem 0.4rem",
-                borderRadius: 6,
-                background: "rgba(10, 10, 10, 0.8)",
-                color: "#fff",
+                padding: "0.2rem 0.5rem",
+                borderRadius: 999,
+                border: "1px solid var(--border-color)",
+                background: "color-mix(in srgb, var(--surface-color) 95%, transparent)",
+                color: "var(--fg-color)",
                 fontSize: 12,
                 lineHeight: 1.2,
                 whiteSpace: "nowrap",

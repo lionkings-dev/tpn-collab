@@ -7,7 +7,7 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useFlow } from "../hooks/useFlow";
@@ -35,6 +35,7 @@ import InputPrompt from "../components/panels/inputPrompt";
 import SignInToSavePrompt from "../components/panels/signInToSavePrompt";
 import ToastPopup from "../components/panels/toastPopup";
 import { nodeTypes, edgeTypes } from "../flow-config";
+import "./EditorPage.css";
 
 type RoomRouteState = {
   roomName?: string;
@@ -67,7 +68,13 @@ export default function EditorPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const [colorMode, setColorMode] = useState<ColorMode>("system");
+  const [colorMode, setColorMode] = useState<ColorMode>(() => {
+    const savedColorMode = localStorage.getItem("tpn-color-mode");
+    if (savedColorMode === "dark" || savedColorMode === "light" || savedColorMode === "system") {
+      return savedColorMode;
+    }
+    return "system";
+  });
 
   // Cross-cutting UI feedback state.
   const { toast, notify, closeToast } = useToastState();
@@ -97,6 +104,33 @@ export default function EditorPage() {
   }, [authDisplayName, backendUser?.id, user?.uid, user?.email]);
 
   const routeRoomName = (location.state as RoomRouteState | null)?.roomName;
+
+  useEffect(() => {
+    const rootElement = document.documentElement;
+    const applyThemeClass = () => {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const shouldUseDark = colorMode === "dark" || (colorMode === "system" && prefersDark);
+      rootElement.classList.toggle("dark-theme", shouldUseDark);
+    };
+
+    applyThemeClass();
+
+    if (colorMode !== "system") {
+      localStorage.setItem("tpn-color-mode", colorMode);
+      return undefined;
+    }
+
+    localStorage.setItem("tpn-color-mode", "system");
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => {
+      applyThemeClass();
+    };
+    mediaQuery.addEventListener("change", handleChange);
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, [colorMode]);
+
   const handleJoinErrorRedirect = useCallback(
     (message: string) => {
       navigate("/", {
@@ -327,7 +361,7 @@ export default function EditorPage() {
           markerEnd: { type: MarkerType.ArrowClosed },
         }}
         colorMode={colorMode}
-        style={{ background: "#ffffff" }}
+        style={{ background: "var(--surface-muted)" }}
         onMove={(_event, nextViewport) => {
           onViewportChange(nextViewport);
         }}

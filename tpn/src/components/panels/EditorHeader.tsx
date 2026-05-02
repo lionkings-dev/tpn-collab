@@ -100,12 +100,16 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   );
 
   return (
-    <Panel position="top-left" className="editor-header">
+    <Panel position="top-left" className="editor-header ui-panel">
       <span className="room-name">{roomName}</span>
-      <button onClick={handleInvite}>Invite</button>
-      <button onClick={onOpenSavePrompt}>Rename Room</button>
+      <button className="ui-button ui-button-secondary" onClick={handleInvite}>
+        Invite
+      </button>
+      <button className="ui-button ui-button-secondary" onClick={onOpenSavePrompt}>
+        Rename Room
+      </button>
       <select
-        className="editor-format-select"
+        className="editor-format-select ui-control"
         value={exportSelection}
         onChange={handleExportSelection}
         aria-label="Export graph format"
@@ -117,7 +121,9 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
           </option>
         ))}
       </select>
-      <button onClick={handleImportClick}>Import</button>
+      <button className="ui-button ui-button-secondary" onClick={handleImportClick}>
+        Import
+      </button>
       <input
         ref={importInputRef}
         type="file"
@@ -130,12 +136,12 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
           <span className="editor-auth-name" title={currentUserName || "Authenticated User"}>
             {currentUserName || "Authenticated User"}
           </span>
-          <button onClick={onLogout} disabled={isAuthLoading}>
+          <button className="ui-button ui-button-ghost" onClick={onLogout} disabled={isAuthLoading}>
             {isAuthLoading ? "Signing out..." : "Sign Out"}
           </button>
         </>
       ) : (
-        <button onClick={onLogin} disabled={isAuthLoading}>
+        <button className="ui-button ui-button-primary" onClick={onLogin} disabled={isAuthLoading}>
           {isAuthLoading ? "Signing in..." : "Log in with Google"}
         </button>
       )}

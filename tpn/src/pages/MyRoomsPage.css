@@ -1,0 +1,134 @@
+.rooms-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent-primary) 10%, transparent) 0%, transparent 56%),
+    var(--bg-color);
+  color: var(--fg-color);
+}
+
+.rooms-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-7) 0 var(--space-5);
+}
+
+.rooms-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
+}
+
+.rooms-subtitle {
+  margin: var(--space-2) 0 0;
+  color: var(--fg-alt-color);
+}
+
+.rooms-content {
+  padding-bottom: var(--space-8);
+}
+
+.rooms-message {
+  margin: 0;
+  color: var(--fg-alt-color);
+}
+
+.rooms-message-error {
+  color: var(--danger-color);
+}
+
+.rooms-empty {
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.rooms-empty h2 {
+  margin: 0 0 var(--space-2);
+}
+
+.rooms-empty p {
+  margin: 0;
+  color: var(--fg-alt-color);
+}
+
+.rooms-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.room-item {
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.room-name {
+  font-size: 1rem;
+}
+
+.room-id {
+  margin: var(--space-1) 0 0;
+  color: var(--fg-alt-color);
+  font-size: 0.86rem;
+}
+
+.room-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.room-archive-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(8, 11, 19, 0.36);
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.room-archive-card {
+  width: min(92vw, 480px);
+  padding: var(--space-5);
+}
+
+.room-archive-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.room-archive-card p {
+  margin: var(--space-3) 0 0;
+  color: var(--fg-alt-color);
+}
+
+.room-archive-actions {
+  margin-top: var(--space-4);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (max-width: 780px) {
+  .rooms-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .room-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .room-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
