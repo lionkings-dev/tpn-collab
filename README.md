@@ -79,7 +79,8 @@ npm run dev:frontend
 
 ## Deployment
 
-- Frontend deploy config: `tpn/vercel.json`
+- Frontend deploy config: `vercel.json` at repo root
+- Frontend Vercel build output: `tpn/dist`
 - Backend deploy config: `railway.json`
 - Keep frontend API/WS URLs aligned with backend deployment URL.
 - Set backend `CORS_ORIGIN` to the deployed frontend origin.

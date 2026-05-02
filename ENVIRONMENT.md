@@ -49,7 +49,8 @@ Set these in `tpn-server/.env` (use `tpn-server/.env.example` as baseline).
 
 ## Deployment Notes
 
-- Frontend deploy config: `tpn/vercel.json`
+- Frontend deploy config: `vercel.json` at repo root
+- Frontend Vercel build output: `tpn/dist`
 - Backend deploy config: `railway.json`
 
 Railway workspace deployment settings:
