@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ROOM_ERROR_CODES } from "@tpn/contracts/error-codes";
 import "./LandingPage.css";
@@ -28,6 +28,7 @@ const LandingPage: React.FC = () => {
   const location = useLocation();
   const routeJoinError =
     (location.state as { joinError?: string } | null)?.joinError || "";
+  const consumedRouteJoinErrorRef = useRef<string | null>(null);
   const [joinInput, setJoinInput] = useState("");
   const [joinError, setJoinError] = useState(routeJoinError);
   const [isJoining, setIsJoining] = useState(false);
@@ -57,9 +58,20 @@ const LandingPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!routeJoinError) return;
+    if (!routeJoinError) {
+      consumedRouteJoinErrorRef.current = null;
+      return;
+    }
+
+    if (consumedRouteJoinErrorRef.current === routeJoinError) {
+      return;
+    }
+
+    consumedRouteJoinErrorRef.current = routeJoinError;
+    setJoinError(routeJoinError);
     showToast(routeJoinError, "error");
-  }, [routeJoinError]);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [routeJoinError, navigate, location.pathname]);
 
   const handleCreateModel = async () => {
     setIsCreating(true);
