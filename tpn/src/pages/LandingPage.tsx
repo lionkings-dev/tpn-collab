@@ -232,7 +232,7 @@ const LandingPage: React.FC = () => {
                 {authName}
               </span>
               <button
-                className="ui-button ui-button-ghost"
+                className="ui-button ui-button-secondary"
                 onClick={() => {
                   navigate("/rooms");
                 }}
@@ -240,7 +240,7 @@ const LandingPage: React.FC = () => {
                 My Rooms
               </button>
               <button
-                className="ui-button ui-button-secondary"
+                className="ui-button ui-button-ghost"
                 onClick={() => {
                   void handleSignOut();
                 }}
