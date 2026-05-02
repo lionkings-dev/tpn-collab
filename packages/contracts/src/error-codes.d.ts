@@ -7,6 +7,7 @@ export declare const ROOM_ERROR_CODES: {
   readonly ROOM_ALREADY_CLAIMED: "room_already_claimed";
   readonly INVALID_ROOM_NAME: "invalid_room_name";
   readonly ROOM_LOOKUP_FAILED: "room_lookup_failed";
+  readonly ROOM_ID_COLLISION: "room_id_collision";
   readonly ROOM_REGISTER_FAILED: "room_register_failed";
   readonly ROOM_LOAD_FAILED: "room_load_failed";
   readonly ROOM_RENAME_FAILED: "room_rename_failed";

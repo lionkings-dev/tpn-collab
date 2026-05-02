@@ -163,40 +163,36 @@ export async function registerRoom({ roomId, roomName, ownerId }) {
   const ownerObjectId = toOwnerObjectId(ownerId);
   const claimToken = ownerObjectId ? null : createClaimToken();
 
-  const setOnInsert = {
+  const roomDocument = {
     _id: roomId,
     name: roomName || "Untitled Model",
     ownerId: ownerObjectId,
     visibility: ROOM_VISIBILITY.PRIVATE,
     status: ROOM_STATUS.ACTIVE,
     createdAt: now,
+    updatedAt: now,
+    lastAccessedAt: now,
   };
 
   if (claimToken) {
-    setOnInsert.claimTokenHash = hashClaimToken(claimToken);
-    setOnInsert.claimTokenIssuedAt = now;
+    roomDocument.claimTokenHash = hashClaimToken(claimToken);
+    roomDocument.claimTokenIssuedAt = now;
   }
 
-  const updateResult = await rooms.updateOne(
-    { _id: roomId },
-    {
-      $setOnInsert: setOnInsert,
-      $set: {
-        updatedAt: now,
-        lastAccessedAt: now,
-      },
-    },
-    { upsert: true },
-  );
-
-  const savedRoom = await rooms.findOne({ _id: roomId });
-  if (!savedRoom) {
-    throw new Error("Failed to register room.");
+  try {
+    await rooms.insertOne(roomDocument);
+  } catch (error) {
+    const duplicateKeyCode =
+      typeof error === "object" && error !== null && "code" in error ? error.code : null;
+    if (duplicateKeyCode === 11000) {
+      throw buildError(ROOM_ERROR_CODES.ROOM_ID_COLLISION);
+    }
+    throw error;
   }
 
   return {
-    ...normalizeRoomDoc(savedRoom),
-    claimToken: updateResult.upsertedCount === 1 ? claimToken : null,
+    ...normalizeRoomDoc(roomDocument),
+    claimToken,
   };
 }
 

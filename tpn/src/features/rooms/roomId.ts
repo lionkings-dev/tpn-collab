@@ -1,51 +1,33 @@
 import { isValidRoomId, normalizeRoomId } from "@tpn/contracts/room-id";
 
-const ADJECTIVES = [
-  "amber",
-  "brisk",
-  "calm",
-  "delta",
-  "ember",
-  "frost",
-  "gold",
-  "harbor",
-  "indigo",
-  "jade",
-  "kilo",
-  "lunar",
-];
+const ROOM_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const ROOM_ID_LENGTH = 6;
 
-const NOUNS = [
-  "atlas",
-  "beacon",
-  "canyon",
-  "drift",
-  "engine",
-  "falcon",
-  "grove",
-  "harbor",
-  "island",
-  "jungle",
-  "kernel",
-  "lantern",
-];
+function randomIndex(maxExclusive: number): number {
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi?.getRandomValues) {
+    const bytes = new Uint32Array(1);
+    cryptoApi.getRandomValues(bytes);
+    return bytes[0] % maxExclusive;
+  }
 
-function randomFrom<T>(items: T[]): T {
-  return items[Math.floor(Math.random() * items.length)];
-}
-
-function randomBase36(length: number): string {
-  return Math.random().toString(36).slice(2, 2 + length);
+  return Math.floor(Math.random() * maxExclusive);
 }
 
 export function generateRoomId(): string {
-  const prefix = `${randomFrom(ADJECTIVES)}-${randomFrom(NOUNS)}`;
-  const suffix = randomBase36(6);
-  return `${prefix}-${suffix}`;
+  let result = "";
+  for (let index = 0; index < ROOM_ID_LENGTH; index += 1) {
+    result += ROOM_ID_ALPHABET[randomIndex(ROOM_ID_ALPHABET.length)];
+  }
+  return result;
 }
 
 export function generateRoomName(roomId?: string): string {
   if (roomId && isValidRoomId(roomId)) {
+    if (/^[A-Z0-9]{6}$/.test(roomId)) {
+      return `Room ${roomId}`;
+    }
+
     return roomId.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
   }
 

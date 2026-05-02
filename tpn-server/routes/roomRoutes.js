@@ -71,6 +71,13 @@ roomRoutes.post("/:roomId/register", attachAuthIfPresent, async (req, res) => {
       claimToken: room.claimToken || null,
     });
   } catch (error) {
+    const code = error instanceof Error && "code" in error ? error.code : null;
+
+    if (code === ROOM_ERROR_CODES.ROOM_ID_COLLISION) {
+      res.status(409).json({ ok: false, error: code });
+      return;
+    }
+
     const message = error instanceof Error ? error.message : "Room register failed.";
     if (message.includes("MONGODB_URI is required")) {
       res.status(503).json({ ok: false, error: ROOM_ERROR_CODES.DB_NOT_CONFIGURED });

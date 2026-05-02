@@ -7,6 +7,7 @@ export const ROOM_ERROR_CODES = Object.freeze({
   ROOM_ALREADY_CLAIMED: "room_already_claimed",
   INVALID_ROOM_NAME: "invalid_room_name",
   ROOM_LOOKUP_FAILED: "room_lookup_failed",
+  ROOM_ID_COLLISION: "room_id_collision",
   ROOM_REGISTER_FAILED: "room_register_failed",
   ROOM_LOAD_FAILED: "room_load_failed",
   ROOM_RENAME_FAILED: "room_rename_failed",

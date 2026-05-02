@@ -78,11 +78,27 @@ export async function registerRoom(
     },
   );
 
-  if (!response.ok) {
-    throw new Error(`room_register_failed_${response.status}`);
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        ok?: boolean;
+        roomId?: string;
+        ownerId?: string | null;
+        claimToken?: string | null;
+        error?: string;
+      }
+    | null;
+
+  if (!response.ok || !payload?.ok || !payload.roomId) {
+    const errorCode = payload?.error || `room_register_failed_${response.status}`;
+    throw new Error(errorCode);
   }
 
-  return (await response.json()) as RegisteredRoomResponse;
+  return {
+    ok: true,
+    roomId: payload.roomId,
+    ownerId: payload.ownerId ?? null,
+    claimToken: payload.claimToken ?? null,
+  };
 }
 
 export async function claimRoomOwnership(

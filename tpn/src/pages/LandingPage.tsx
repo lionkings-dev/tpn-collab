@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ROOM_ERROR_CODES } from "@tpn/contracts/error-codes";
 import "./LandingPage.css";
 import ToastPopup, { type ToastType } from "../components/panels/toastPopup";
 import { useAuth } from "../auth/AuthContext";
@@ -19,6 +20,8 @@ type ToastState = {
   message: string;
   type: ToastType;
 };
+
+const CREATE_ROOM_MAX_ATTEMPTS = 5;
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -60,8 +63,6 @@ const LandingPage: React.FC = () => {
 
   const handleCreateModel = async () => {
     setIsCreating(true);
-    const roomId = generateRoomId();
-    const roomName = generateRoomName(roomId);
 
     try {
       let idToken: string | undefined;
@@ -69,30 +70,49 @@ const LandingPage: React.FC = () => {
         idToken = await user.getIdToken();
       }
 
-      const createdRoom = await registerRoom(roomId, {
-        idToken,
-        name: roomName,
-      });
+      for (let attempt = 1; attempt <= CREATE_ROOM_MAX_ATTEMPTS; attempt += 1) {
+        const roomId = generateRoomId();
+        const roomName = generateRoomName(roomId);
 
-      if (createdRoom.claimToken) {
-        saveRoomClaimToken(roomId, createdRoom.claimToken);
+        try {
+          const createdRoom = await registerRoom(roomId, {
+            idToken,
+            name: roomName,
+          });
+          const createdRoomId = createdRoom.roomId;
+
+          if (createdRoom.claimToken) {
+            saveRoomClaimToken(createdRoomId, createdRoom.claimToken);
+          } else {
+            clearRoomClaimToken(createdRoomId);
+          }
+
+          navigate(`/room/${createdRoomId}`, {
+            state: {
+              roomName,
+            },
+          });
+          return;
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message === ROOM_ERROR_CODES.ROOM_ID_COLLISION &&
+            attempt < CREATE_ROOM_MAX_ATTEMPTS
+          ) {
+            continue;
+          }
+
+          throw error;
+        }
       }
 
-      if (!createdRoom.claimToken) {
-        clearRoomClaimToken(roomId);
-      }
-
-      navigate(`/room/${roomId}`, {
-        state: {
-          roomName,
-        },
-      });
+      const collisionMessage = "Could not allocate a unique room ID. Please try again.";
+      setJoinError(collisionMessage);
+      showToast(collisionMessage, "error");
     } catch {
       const message = "Could not create room right now. Please try again.";
       setJoinError(message);
       showToast(message, "error");
-      setIsCreating(false);
-      return;
     } finally {
       setIsCreating(false);
     }
