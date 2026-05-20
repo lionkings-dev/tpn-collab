@@ -1,4 +1,4 @@
-function normalizeFileBaseName(value: string) {
+export function normalizeFileBaseName(value: string) {
   const normalized = value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
   return normalized.replace(/-{2,}/g, "-").replace(/^-|-$/g, "");
 }

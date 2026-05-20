@@ -14,15 +14,14 @@ import {
 
 import * as Y from "yjs";
 
+import {
+  normalizeTransitionBound,
+  isValidConnection as checkConnection,
+} from "./flowValidation";
+
 const POSITION_UPDATE_ORIGIN = "position_origin_ref";
 const POSITION_THROTTLE_MS = 30;
 type TransitionBound = number | null;
-
-function normalizeTransitionBound(value: unknown, fallback: TransitionBound) {
-  if (value === null) return null;
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.max(0, Math.floor(value));
-}
 
 function createId(prefix: string) {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -113,25 +112,7 @@ export function useFlow(ydoc: Y.Doc, getViewport: () => Viewport) {
   }, [setNodes, setEdges, yNodes, yEdges]);
 
   const isValidConnection = useCallback(
-    (connection: Connection | Edge) => {
-      const sourceNode = nodes.find((node) => node.id === connection.source);
-      const targetNode = nodes.find((node) => node.id === connection.target);
-
-      if (!sourceNode || !targetNode) {
-        return false;
-      }
-      if (sourceNode.id === targetNode.id) {
-        return false;
-      }
-      if (sourceNode.type === "place" && targetNode.type === "transition") {
-        return true;
-      }
-      if (sourceNode.type === "transition" && targetNode.type === "place") {
-        return true;
-      }
-
-      return false;
-    },
+    (connection: Connection | Edge) => checkConnection(connection, nodes),
     [nodes],
   );
 

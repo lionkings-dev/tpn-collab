@@ -16,7 +16,7 @@ const ROOMS_INDEXES = {
   lastAccessedAt: { lastAccessedAt: 1 },
 };
 
-function normalizeRoomDoc(roomDoc) {
+export function normalizeRoomDoc(roomDoc) {
   return {
     roomId: roomDoc._id,
     name: roomDoc.name,
@@ -29,7 +29,7 @@ function normalizeRoomDoc(roomDoc) {
   };
 }
 
-function buildError(code) {
+export function buildError(code) {
   const error = new Error(code);
   error.code = code;
   return error;
@@ -75,7 +75,7 @@ async function ensureRoomsIndexes(roomsCollection) {
   });
 }
 
-function toOwnerObjectId(ownerId) {
+export function toOwnerObjectId(ownerId) {
   if (!ownerId) return null;
   if (!ObjectId.isValid(ownerId)) return null;
   return new ObjectId(ownerId);
@@ -85,7 +85,7 @@ function createClaimToken() {
   return randomBytes(24).toString("base64url");
 }
 
-function hashClaimToken(token) {
+export function hashClaimToken(token) {
   return createHash("sha256").update(token).digest("hex");
 }
 

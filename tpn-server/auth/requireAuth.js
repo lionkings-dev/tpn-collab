@@ -1,14 +1,7 @@
 import { getFirebaseAdminAuth, isFirebaseConfigured } from "./firebaseAdmin.js";
 import { upsertUserFromDecodedToken } from "./usersRepo.js";
 import { AUTH_ERROR_CODES } from "@tpn/contracts/error-codes";
-
-function getBearerToken(headerValue) {
-  if (!headerValue) return null;
-  const [scheme, token] = headerValue.split(" ");
-  if (!scheme || !token) return null;
-  if (scheme.toLowerCase() !== "bearer") return null;
-  return token.trim() || null;
-}
+import { getBearerToken } from "./tokenUtils.js";
 
 export async function requireAuth(req, res, next) {
   if (!isFirebaseConfigured()) {

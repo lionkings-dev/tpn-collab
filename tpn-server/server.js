@@ -15,7 +15,8 @@ import {
 import authRoutes from "./routes/authRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js";
-import { isValidRoomId, normalizeRoomId } from "./utils/roomId.js";
+import { isValidRoomId } from "./utils/roomId.js";
+import { resolveRoomIdFromUpgradeUrl } from "./utils/wsUrl.js";
 
 const port = process.env.PORT || 1234;
 const app = express();
@@ -37,17 +38,6 @@ function rejectUpgrade(socket, statusCode, reason) {
     `HTTP/1.1 ${statusCode} ${reason}\r\nConnection: close\r\nContent-Type: text/plain\r\n\r\n${reason}`,
   );
   socket.destroy();
-}
-
-function resolveRoomIdFromUpgradeUrl(rawUrl) {
-  const parsed = new URL(rawUrl || "/", "http://localhost");
-  const pathSegments = parsed.pathname.split("/").filter(Boolean);
-  const roomSegment = pathSegments.at(-1) || "";
-  const roomId = normalizeRoomId(roomSegment);
-  return {
-    roomId,
-    search: parsed.search,
-  };
 }
 
 function incrementRoomConnection(roomId) {

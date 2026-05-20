@@ -7,6 +7,7 @@
     "start": "node server.js",
     "dev": "nodemon --config nodemon.json",
     "test": "node scripts/day1-smoke.mjs",
+    "test:unit": "vitest run",
     "test:day1": "node scripts/day1-smoke.mjs",
     "test:day2": "node scripts/day2-owner-smoke.mjs",
     "test:day3": "node scripts/day3-yjs-persistence-smoke.mjs"
@@ -28,6 +29,7 @@
     "yjs": "^13.6.29"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.11",
+    "vitest": "^4.1.2"
   }
 }
