@@ -1,5 +1,11 @@
 import type { FormatId } from "./types";
 
+function stripLeadingPppComments(content: string) {
+  return content
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+}
+
 export function detectFormatFromContent(content: string): FormatId | null {
   const trimmed = content.trim();
   if (!trimmed) return null;
@@ -8,7 +14,8 @@ export function detectFormatFromContent(content: string): FormatId | null {
     return "pnml";
   }
 
-  if (/^\s*spec\s*\(/i.test(trimmed)) {
+  const pppCandidate = stripLeadingPppComments(trimmed).trim();
+  if (/^(?:spec\s*\(|module\s+[^\s(]+\s*\()/i.test(pppCandidate)) {
     return "ppp";
   }
 

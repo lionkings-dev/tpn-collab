@@ -1,0 +1,23 @@
+// g13 OR GATE
+module g13(w9-, w9+, w10-, w10+; existallzero+, existallzero-){
+  place (p0, p1, p2, p3, p4, p5, p6, p7);
+  trans (existallzero+, existallzero-, t2@g13, t3@g13, t4@g13, w9-, w9+, w10-, w10+);
+  token (p1, p3, p5, p7);
+  existallzero+ [4,5] (p0, p7)/(p0, p6);
+  existallzero- [4,5] (p1, p6)/(p1, p7);
+  t2@g13 [0,0] (p1, p2)/(p0, p2);
+  t3@g13 [0,0] (p1, p4)/(p0, p4);
+  t4@g13 [0,0] (p0, p3, p5)/(p1, p3, p5);
+  w9- (p4)/(p5);
+  w9+ (p5)/(p4);
+  w10- (p2)/(p3);
+  w10+ (p3)/(p2);
+  existallzero+ = (existallzero+);
+  existallzero- = (existallzero-);
+  w9- = (w9-);
+  w9+ = (w9+);
+  w10- = (w10-);
+  w10+ = (w10+);
+
+}
+

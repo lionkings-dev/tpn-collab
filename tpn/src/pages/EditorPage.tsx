@@ -14,6 +14,7 @@ import { useFlow } from "../hooks/useFlow";
 import { useAwareness, useYjsProvider } from "../features/collaboration";
 import {
   buildDownloadFileName,
+  describeImportError,
   detectImportFormat,
   downloadTextFile,
   exportGraph,
@@ -317,11 +318,7 @@ export default function EditorPage() {
         }
 
         if (resolvedFormatId) {
-          const format = getFormatById(resolvedFormatId);
-          notify(
-            `${format.label} import failed. Please verify file content and retry.`,
-            "error",
-          );
+          notify(describeImportError(resolvedFormatId, error), "error");
           return;
         }
 

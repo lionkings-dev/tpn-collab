@@ -18,6 +18,7 @@ export {
 } from "./core/registry";
 export type { ImportGraphOptions } from "./core/registry";
 export { buildDownloadFileName, downloadTextFile } from "./core/download";
+export { describeImportError, describeExportError } from "./core/errorMessages";
 export type {
   ExportFormatOption,
   FormatId,
