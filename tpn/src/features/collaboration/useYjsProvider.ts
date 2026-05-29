@@ -7,7 +7,7 @@ import { resolveWsUrl } from "../../config/network";
 export function useYjsProvider(roomId: string, enabled = true) {
   const [connected, setConnected] = useState(false);
 
-  const ydoc = useMemo(() => new Y.Doc(), [roomId]);
+  const ydoc = useMemo(() => new Y.Doc({ guid: roomId }), [roomId]);
   const wsUrl = useMemo(() => {
     const envUrl = import.meta.env.VITE_WS_URL as string | undefined;
     return resolveWsUrl(envUrl);

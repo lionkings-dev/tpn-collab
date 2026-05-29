@@ -1,16 +1,7 @@
 import { getRoomApiBaseUrl } from "../rooms";
+import type { MeResponseUser } from "@tpn/contracts/auth-contracts";
 
-export type MeResponseUser = {
-  id: string;
-  provider: string;
-  providerId: string;
-  email: string;
-  displayName: string;
-  photoURL: string | null;
-  createdAt: string;
-  updatedAt: string;
-  lastLoginAt: string;
-};
+export type { MeResponseUser } from "@tpn/contracts/auth-contracts";
 
 type MeResponse = {
   ok: true;

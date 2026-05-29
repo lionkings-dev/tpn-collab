@@ -1,4 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
+import { inferArcHandles } from "./core/handles";
 
 type PlaceNodeData = {
   label: string;
@@ -7,8 +8,8 @@ type PlaceNodeData = {
 
 type TransitionNodeData = {
   label: string;
-  lb: number;
-  ub: number;
+  lb: number | null;
+  ub: number | null;
   isEditing: boolean;
 };
 
@@ -111,11 +112,50 @@ function parseTransitionInterval(transition: Element) {
     const timeInterval = firstDirectChildByLocalName(toolspecific, "timeInterval");
     if (!timeInterval) continue;
 
-    const lb = toNonNegativeInteger(nestedText(timeInterval, ["lb"]), 0);
-    const ub = toNonNegativeInteger(nestedText(timeInterval, ["ub"]), lb);
+    const parseTransitionBound = (
+      value: unknown,
+      fallback: number | null,
+    ): number | null => {
+      if (value === undefined || value === null) {
+        return fallback;
+      }
+
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (!normalized) {
+          return fallback;
+        }
+        if (normalized === "inf" || normalized === "infinity") {
+          return null;
+        }
+
+        const parsed = Number.parseInt(normalized, 10);
+        if (Number.isFinite(parsed)) {
+          return Math.max(0, parsed);
+        }
+        return fallback;
+      }
+
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return Math.max(0, Math.floor(value));
+      }
+
+      return fallback;
+    };
+
+    const lb = parseTransitionBound(nestedText(timeInterval, ["lb"]), 0);
+    const ub = parseTransitionBound(nestedText(timeInterval, ["ub"]), lb);
+
+    if (lb === null && ub !== null) {
+      throw new Error("pnml_import_invalid_transition_interval");
+    }
+    if (lb !== null && ub !== null && lb > ub) {
+      throw new Error("pnml_import_invalid_transition_interval");
+    }
+
     return {
       lb,
-      ub: Math.max(lb, ub),
+      ub,
     };
   }
 
@@ -172,42 +212,6 @@ function parseArcHandleHints(arc: Element) {
   }
 
   return fallback || {};
-}
-
-function inferArcHandles(sourceNode: Node, targetNode: Node) {
-  const sourceType = toNodeType(sourceNode.type);
-  const targetType = toNodeType(targetNode.type);
-  if (!sourceType || !targetType) {
-    return {};
-  }
-
-  const dx = targetNode.position.x - sourceNode.position.x;
-  const dy = targetNode.position.y - sourceNode.position.y;
-  const horizontalDominant = Math.abs(dx) >= Math.abs(dy);
-
-  let sourceHandle: string;
-  let targetHandle: string;
-
-  if (horizontalDominant) {
-    sourceHandle = dx >= 0 ? "r.source" : "l.source";
-    targetHandle = dx >= 0 ? "l.target" : "r.target";
-  } else {
-    sourceHandle = dy >= 0 ? "b.source" : "t.source";
-    targetHandle = dy >= 0 ? "t.target" : "b.target";
-  }
-
-  if (sourceType === "transition") {
-    sourceHandle = dx >= 0 ? "r.source" : "l.source";
-  }
-
-  if (targetType === "transition") {
-    targetHandle = dx >= 0 ? "l.target" : "r.target";
-  }
-
-  return {
-    sourceHandle,
-    targetHandle,
-  };
 }
 
 export function importPnml(xmlContent: string): PnmlImportResult {

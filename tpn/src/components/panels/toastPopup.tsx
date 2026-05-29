@@ -55,7 +55,7 @@ export default function ToastPopup({
             onClick={onClose}
             aria-label="Close notification"
           >
-            x
+            ×
           </button>
         )}
       </div>

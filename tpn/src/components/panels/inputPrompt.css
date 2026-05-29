@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 1100;
-  background: rgba(2, 6, 23, 0.45);
+  background: rgba(8, 11, 19, 0.36);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -10,42 +10,36 @@
 
 .input-prompt-card {
   width: min(92vw, 420px);
-  background: var(--bg-color);
-  border: 1px solid var(--fg-alt-color);
-  border-radius: 12px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
-  padding: 16px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-4);
 }
 
 .input-prompt-title {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.04rem;
 }
 
 .input-prompt-description {
   margin: 8px 0 12px;
   color: var(--fg-alt-color);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
 }
 
 .input-prompt-input {
   width: 100%;
-  box-sizing: border-box;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--fg-alt-color);
-  background: var(--bg-alt-color);
-  color: var(--fg-color);
 }
 
 .input-prompt-input.is-invalid {
-  border-color: #ef4444;
+  border-color: var(--danger-color);
 }
 
 .input-prompt-error {
   margin: 8px 0 0;
   font-size: 0.86rem;
-  color: #ef4444;
+  color: var(--danger-color);
 }
 
 .input-prompt-actions {
@@ -56,15 +50,5 @@
 }
 
 .input-prompt-btn {
-  border: 1px solid var(--fg-alt-color);
-  background: var(--accent-primary);
-  color: var(--bg-color);
-  border-radius: 8px;
-  padding: 8px 12px;
-  cursor: pointer;
-}
-
-.input-prompt-btn.ghost {
-  background: transparent;
-  color: var(--fg-color);
+  min-width: 94px;
 }

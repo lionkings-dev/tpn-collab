@@ -22,10 +22,10 @@ export default function SignInToSavePrompt({
           name later.
         </p>
         <div className="signin-save-actions">
-          <button type="button" className="signin-save-btn ghost" onClick={onClose}>
+          <button type="button" className="ui-button ui-button-secondary signin-save-btn" onClick={onClose}>
             Continue as Guest
           </button>
-          <button type="button" className="signin-save-btn" onClick={onSignIn}>
+          <button type="button" className="ui-button ui-button-primary signin-save-btn" onClick={onSignIn}>
             Sign In with Google
           </button>
         </div>

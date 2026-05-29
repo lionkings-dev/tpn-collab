@@ -1,6 +1,6 @@
 import admin from "firebase-admin";
 
-function readEnv(name) {
+export function readEnv(name) {
   const value = process.env[name];
   return value ? value.trim() : "";
 }

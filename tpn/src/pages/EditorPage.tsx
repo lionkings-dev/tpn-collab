@@ -4,14 +4,25 @@ import {
   Controls,
   MarkerType,
   type ColorMode,
+  type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useFlow } from "../hooks/useFlow";
 import { useAwareness, useYjsProvider } from "../features/collaboration";
-import { exportPnml, importPnml } from "../features/export";
+import {
+  buildDownloadFileName,
+  describeImportError,
+  detectImportFormat,
+  downloadTextFile,
+  exportGraph,
+  getFormatById,
+  importGraph,
+  listExportFormats,
+  type FormatId,
+} from "../features/export";
 import { useToastState } from "../features/editor/hooks/useToastState";
 import { useCursorLayer } from "../features/editor/hooks/useCursorLayer";
 import { useEditorRoomAccess } from "../features/editor/hooks/useEditorRoomAccess";
@@ -25,6 +36,7 @@ import InputPrompt from "../components/panels/inputPrompt";
 import SignInToSavePrompt from "../components/panels/signInToSavePrompt";
 import ToastPopup from "../components/panels/toastPopup";
 import { nodeTypes, edgeTypes } from "../flow-config";
+import "./EditorPage.css";
 
 type RoomRouteState = {
   roomName?: string;
@@ -52,18 +64,18 @@ function validateRoomName(value: string) {
   return null;
 }
 
-function toDownloadFileName(value: string) {
-  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
-  const cleaned = normalized.replace(/-{2,}/g, "-").replace(/^-|-$/g, "");
-  return cleaned ? `${cleaned}.pnml` : "tpn-room.pnml";
-}
-
 export default function EditorPage() {
   // Routing + page-level UI state.
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const [colorMode, setColorMode] = useState<ColorMode>("dark");
+  const [colorMode, setColorMode] = useState<ColorMode>(() => {
+    const savedColorMode = localStorage.getItem("tpn-color-mode");
+    if (savedColorMode === "dark" || savedColorMode === "light" || savedColorMode === "system") {
+      return savedColorMode;
+    }
+    return "system";
+  });
 
   // Cross-cutting UI feedback state.
   const { toast, notify, closeToast } = useToastState();
@@ -71,6 +83,7 @@ export default function EditorPage() {
 
   // Root editor element used for pointer-to-canvas projection.
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<Viewport>({ x: 0, y: 0, zoom: 1 });
 
   // Auth session and identity used in header and awareness labels.
   const {
@@ -92,6 +105,33 @@ export default function EditorPage() {
   }, [authDisplayName, backendUser?.id, user?.uid, user?.email]);
 
   const routeRoomName = (location.state as RoomRouteState | null)?.roomName;
+
+  useEffect(() => {
+    const rootElement = document.documentElement;
+    const applyThemeClass = () => {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const shouldUseDark = colorMode === "dark" || (colorMode === "system" && prefersDark);
+      rootElement.classList.toggle("dark-theme", shouldUseDark);
+    };
+
+    applyThemeClass();
+
+    if (colorMode !== "system") {
+      localStorage.setItem("tpn-color-mode", colorMode);
+      return undefined;
+    }
+
+    localStorage.setItem("tpn-color-mode", "system");
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => {
+      applyThemeClass();
+    };
+    mediaQuery.addEventListener("change", handleChange);
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, [colorMode]);
+
   const handleJoinErrorRedirect = useCallback(
     (message: string) => {
       navigate("/", {
@@ -150,6 +190,14 @@ export default function EditorPage() {
     clearLocalCursor,
   });
 
+  const onViewportChange = useCallback(
+    (vp: Viewport) => {
+      handleViewportChange(vp);
+      viewportRef.current = vp;
+    },
+    [handleViewportChange],
+  );
+
   // React Flow state/actions synchronized to Yjs maps.
   const {
     nodes,
@@ -164,7 +212,7 @@ export default function EditorPage() {
     replaceGraph,
     addToken,
     onNodeDoubleClick,
-  } = useFlow(ydoc);
+  } = useFlow(ydoc, () => viewportRef.current);
 
   const handleOpenSavePrompt = useCallback(() => {
     setIsSavePromptOpen(true);
@@ -187,7 +235,10 @@ export default function EditorPage() {
 
         if (result === "local_only") {
           setIsSavePromptOpen(false);
-          notify("Name saved locally only. Owner login is required to persist.", "info");
+          notify(
+            "Name saved locally only. Owner login is required to persist.",
+            "info",
+          );
           return;
         }
 
@@ -205,46 +256,73 @@ export default function EditorPage() {
     void logout();
   }, [logout]);
 
-  const handleExportPnml = useCallback(() => {
+  const exportFormats = useMemo(() => listExportFormats(), []);
+
+  const handleExport = useCallback((formatId: FormatId) => {
     try {
-      const pnml = exportPnml({
+      const serializedGraph = exportGraph(formatId, {
         roomId: activeRoomId,
         roomName,
         nodes,
         edges,
       });
+      const format = getFormatById(formatId);
+      const fileName = buildDownloadFileName(
+        roomName || activeRoomId,
+        format.extensions[0] || ".txt",
+      );
+      const mimeType = format.mimeTypes[0] || "text/plain;charset=utf-8";
 
-      const fileName = toDownloadFileName(roomName || activeRoomId);
-      const blob = new Blob([pnml], {
-        type: "application/xml;charset=utf-8",
-      });
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(objectUrl);
-
-      notify("PNML exported successfully.", "success");
+      downloadTextFile(serializedGraph, fileName, mimeType);
+      notify(`${format.label} exported successfully.`, "success");
     } catch {
-      notify("Export failed. Please verify your graph before retrying.", "error");
+      notify(
+        "Export failed. Please verify your graph before retrying.",
+        "error",
+      );
     }
   }, [activeRoomId, roomName, nodes, edges, notify]);
 
-  const handleImportPnml = useCallback(
+  const handleImport = useCallback(
     async (file: File) => {
+      let resolvedFormatId: FormatId | null = null;
+
       try {
         const content = await file.text();
-        const importedGraph = importPnml(content);
+        resolvedFormatId = detectImportFormat(content, file.name);
+
+        if (!resolvedFormatId) {
+          throw new Error("import_format_not_detected");
+        }
+
+        const importedGraph = importGraph(content, {
+          formatId: "auto",
+          fileName: file.name,
+        });
         replaceGraph(importedGraph.nodes, importedGraph.edges);
+        const format = getFormatById(resolvedFormatId);
         notify(
-          `PNML imported: ${importedGraph.nodes.length} nodes, ${importedGraph.edges.length} arcs.`,
+          `${format.label} imported: ${importedGraph.nodes.length} nodes, ${importedGraph.edges.length} arcs.`,
           "success",
         );
-      } catch {
-        notify("Import failed. Please upload a valid PNML file.", "error");
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "import_format_not_detected"
+        ) {
+          notify(
+            "Import format not detected. Upload PNML (.pnml/.xml) or PPP (.ppp/.spec/.txt).",
+            "error",
+          );
+          return;
+        }
+
+        if (resolvedFormatId) {
+          notify(describeImportError(resolvedFormatId, error), "error");
+          return;
+        }
+
+        notify("Import failed. Please upload a valid PNML or PPP file.", "error");
       }
     },
     [notify, replaceGraph],
@@ -280,9 +358,9 @@ export default function EditorPage() {
           markerEnd: { type: MarkerType.ArrowClosed },
         }}
         colorMode={colorMode}
-        style={{ background: "#ffffff" }}
+        style={{ background: "var(--surface-muted)" }}
         onMove={(_event, nextViewport) => {
-          handleViewportChange(nextViewport);
+          onViewportChange(nextViewport);
         }}
         fitView
       >
@@ -293,8 +371,9 @@ export default function EditorPage() {
           roomName={roomName}
           onOpenSavePrompt={handleOpenSavePrompt}
           onNotify={notify}
-          onExport={handleExportPnml}
-          onImportFile={handleImportPnml}
+          exportFormats={exportFormats}
+          onExport={handleExport}
+          onImportFile={handleImport}
           currentUserName={authDisplayName}
           isAuthenticated={isAuthenticated}
           isAuthLoading={authLoading || isAuthActionLoading}

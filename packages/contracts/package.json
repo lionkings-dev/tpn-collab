@@ -1,0 +1,28 @@
+{
+  "name": "@tpn/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/index.d.ts"
+    },
+    "./room-id": {
+      "import": "./src/room-id.js",
+      "types": "./src/room-id.d.ts"
+    },
+    "./room-contracts": {
+      "import": "./src/room-contracts.js",
+      "types": "./src/room-contracts.d.ts"
+    },
+    "./auth-contracts": {
+      "import": "./src/auth-contracts.js",
+      "types": "./src/auth-contracts.d.ts"
+    },
+    "./error-codes": {
+      "import": "./src/error-codes.js",
+      "types": "./src/error-codes.d.ts"
+    }
+  }
+}

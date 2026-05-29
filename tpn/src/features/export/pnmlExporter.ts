@@ -11,8 +11,8 @@ type PlaceNodeData = {
 
 type TransitionNodeData = {
   label?: string;
-  lb?: number;
-  ub?: number;
+  lb?: number | null;
+  ub?: number | null;
 };
 
 export type PnmlExportInput = {
@@ -33,6 +33,35 @@ function normalizeHandleValue(value: unknown) {
 function toInteger(value: unknown, fallback = 0) {
   if (typeof value !== "number" || Number.isNaN(value)) return fallback;
   return Math.max(0, Math.floor(value));
+}
+
+function toTransitionBound(
+  value: unknown,
+  fallback: number | null,
+): number | null {
+  if (value === null) return null;
+  if (value === undefined) return fallback;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.max(0, Math.floor(value));
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return fallback;
+    if (normalized === "inf" || normalized === "infinity") return null;
+
+    const parsed = Number.parseInt(normalized, 10);
+    if (Number.isFinite(parsed)) {
+      return Math.max(0, parsed);
+    }
+  }
+
+  return fallback;
+}
+
+function serializeTransitionBound(value: number | null) {
+  return value === null ? "inf" : String(value);
 }
 
 function toBinaryMarking(value: unknown) {
@@ -145,16 +174,24 @@ export function exportPnml(input: PnmlExportInput): string {
 
     appendGraphicsPosition(transition, node.position.x, node.position.y);
 
-    const lb = toInteger(data.lb, 0);
-    const ub = toInteger(data.ub, 0);
+    const lb = toTransitionBound(data.lb, 0);
+    const ub = toTransitionBound(data.ub, lb);
+    if (lb === null && ub !== null) {
+      throw new Error("pnml_export_invalid_transition_interval");
+    }
+    if (lb !== null && ub !== null && lb > ub) {
+      throw new Error("pnml_export_invalid_transition_interval");
+    }
     // lb,ub using toolspecific
     const toolSpecific = xmlDocument.createElementNS(PNML_NS, "toolspecific");
     toolSpecific.setAttribute("tool", "tpn-collab");
     toolSpecific.setAttribute("version", "1.0");
     const timeInterval = xmlDocument.createElementNS(PNML_NS, "timeInterval");
-    timeInterval.appendChild(createTextElement(xmlDocument, "lb", String(lb)));
     timeInterval.appendChild(
-      createTextElement(xmlDocument, "ub", String(Math.max(lb, ub))),
+      createTextElement(xmlDocument, "lb", serializeTransitionBound(lb)),
+    );
+    timeInterval.appendChild(
+      createTextElement(xmlDocument, "ub", serializeTransitionBound(ub)),
     );
     toolSpecific.appendChild(timeInterval);
     transition.appendChild(toolSpecific);

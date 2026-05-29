@@ -9,12 +9,19 @@ import {
   type Connection,
   type NodeChange,
   type EdgeChange,
+  type Viewport,
 } from "@xyflow/react";
 
 import * as Y from "yjs";
 
+import {
+  normalizeTransitionBound,
+  isValidConnection as checkConnection,
+} from "./flowValidation";
+
 const POSITION_UPDATE_ORIGIN = "position_origin_ref";
 const POSITION_THROTTLE_MS = 30;
+type TransitionBound = number | null;
 
 function createId(prefix: string) {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -27,7 +34,7 @@ function createId(prefix: string) {
   return `${prefix}-${timePart}${randomPart}`;
 }
 
-export function useFlow(ydoc: Y.Doc) {
+export function useFlow(ydoc: Y.Doc, getViewport: () => Viewport) {
   const [nodes, setNodes] = useNodesState<Node>([]);
   const [edges, setEdges] = useEdgesState<Edge>([]);
 
@@ -105,25 +112,7 @@ export function useFlow(ydoc: Y.Doc) {
   }, [setNodes, setEdges, yNodes, yEdges]);
 
   const isValidConnection = useCallback(
-    (connection: Connection | Edge) => {
-      const sourceNode = nodes.find((node) => node.id === connection.source);
-      const targetNode = nodes.find((node) => node.id === connection.target);
-
-      if (!sourceNode || !targetNode) {
-        return false;
-      }
-      if (sourceNode.id === targetNode.id) {
-        return false;
-      }
-      if (sourceNode.type === "place" && targetNode.type === "transition") {
-        return true;
-      }
-      if (sourceNode.type === "transition" && targetNode.type === "place") {
-        return true;
-      }
-
-      return false;
-    },
+    (connection: Connection | Edge) => checkConnection(connection, nodes),
     [nodes],
   );
 
@@ -225,32 +214,46 @@ export function useFlow(ydoc: Y.Doc) {
   );
 
   const addPlaces = useCallback(() => {
-    const placeLabel = `p${yNodes.size + 1}`;
+    const placeCount = Array.from(yNodes.values()).filter(
+      (n) => n.type === "place",
+    ).length;
+    const placeLabel = `p${placeCount}`;
+
+    const viewport = getViewport();
+    const offsetX = (Math.random() - 0.5) * 100;
+    const offsetY = (Math.random() - 0.5) * 100;
+    const x = (-viewport.x + window.innerWidth / 2) / viewport.zoom + offsetX;
+    const y = (-viewport.y + window.innerHeight / 2) / viewport.zoom + offsetY;
+
     const newNode: Node = {
       id: createId("p"),
       data: { label: placeLabel, tokens: 0 },
       type: "place",
-      position: {
-        x: Math.random() * window.innerWidth - 100,
-        y: Math.random() * window.innerHeight,
-      },
+      position: { x, y },
     };
     yNodes.set(newNode.id, newNode);
-  }, [yNodes]);
+  }, [yNodes, getViewport]);
 
   const addTransition = useCallback(() => {
-    const transitionLabel = `t${yEdges.size + 1}`;
+    const transitionCount = Array.from(yNodes.values()).filter(
+      (n) => n.type === "transition",
+    ).length;
+    const transitionLabel = `t${transitionCount}`;
+
+    const viewport = getViewport();
+    const offsetX = (Math.random() - 0.5) * 100;
+    const offsetY = (Math.random() - 0.5) * 100;
+    const x = (-viewport.x + window.innerWidth / 2) / viewport.zoom + offsetX;
+    const y = (-viewport.y + window.innerHeight / 2) / viewport.zoom + offsetY;
+
     const newNode: Node = {
       id: createId("t"),
       data: { label: transitionLabel, lb: 0, ub: 0, isEditing: false },
       type: "transition",
-      position: {
-        x: Math.random() * window.innerWidth - 100,
-        y: Math.random() * window.innerHeight,
-      },
+      position: { x, y },
     };
     yNodes.set(newNode.id, newNode);
-  }, [yEdges, yNodes]);
+  }, [yNodes, getViewport]);
 
   const clearCanvas = useCallback(() => {
     yNodes.clear();
@@ -319,19 +322,20 @@ export function useFlow(ydoc: Y.Doc) {
   );
 
   const updateTransitionTime = useCallback(
-    (nodeId: string, lb: number, ub: number) => {
-      const nextLb = Number.isFinite(lb) ? Math.max(0, Math.floor(lb)) : 0;
-      const nextUb = Number.isFinite(ub) ? Math.max(0, Math.floor(ub)) : 0;
+    (nodeId: string, lb: TransitionBound, ub: TransitionBound) => {
+      const nextLb = normalizeTransitionBound(lb, 0);
+      const nextUb = normalizeTransitionBound(ub, nextLb);
 
-      if (nextLb > nextUb) return;
+      if (nextLb === null && nextUb !== null) return false;
+      if (nextLb !== null && nextUb !== null && nextLb > nextUb) return false;
 
       const yNode = yNodes.get(nodeId) as Node | undefined;
-      if (!yNode || yNode.type !== "transition") return;
+      if (!yNode || yNode.type !== "transition") return false;
 
-      const currentLb = typeof yNode.data.lb === "number" ? yNode.data.lb : 0;
-      const currentUb = typeof yNode.data.ub === "number" ? yNode.data.ub : 0;
+      const currentLb = normalizeTransitionBound(yNode.data.lb, 0);
+      const currentUb = normalizeTransitionBound(yNode.data.ub, currentLb);
 
-      if (currentLb === nextLb && currentUb === nextUb) return;
+      if (currentLb === nextLb && currentUb === nextUb) return true;
 
       ydoc.transact(() => {
         yNodes.set(nodeId, {
@@ -343,6 +347,8 @@ export function useFlow(ydoc: Y.Doc) {
           },
         });
       });
+
+      return true;
     },
     [yNodes, ydoc],
   );

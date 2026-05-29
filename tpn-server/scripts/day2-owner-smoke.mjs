@@ -1,3 +1,16 @@
+import { CLAIM_ROOM_STATUS } from "@tpn/contracts/room-contracts";
+import { spawn } from "child_process";
+import { config as loadDotenv } from "dotenv";
+import { setTimeout as delay } from "timers/promises";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
+const scriptPath = fileURLToPath(import.meta.url);
+const scriptDir = dirname(scriptPath);
+const backendRoot = resolve(scriptDir, "..");
+
+loadDotenv({ path: resolve(backendRoot, ".env") });
+
 const baseUrl = (process.env.ROOM_API_URL || "http://localhost:1234").replace(/\/$/, "");
 const authToken = process.env.AUTH_BEARER_TOKEN || "";
 
@@ -29,8 +42,62 @@ function assert(condition, message) {
   }
 }
 
+async function isServerHealthy() {
+  try {
+    const response = await fetch(`${baseUrl}/`);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForHealthy(maxRetries = 40) {
+  for (let index = 0; index < maxRetries; index += 1) {
+    if (await isServerHealthy()) {
+      return;
+    }
+    await delay(250);
+  }
+
+  throw new Error("Server did not become healthy in time");
+}
+
+function startServerProcess() {
+  const child = spawn("node", ["server.js"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: process.env,
+    cwd: backendRoot,
+  });
+
+  child.stdout.on("data", (chunk) => {
+    process.stdout.write(`[server] ${chunk}`);
+  });
+  child.stderr.on("data", (chunk) => {
+    process.stderr.write(`[server] ${chunk}`);
+  });
+
+  return child;
+}
+
+async function stopServerProcess(child) {
+  if (!child || child.killed) return;
+
+  child.kill("SIGTERM");
+  await Promise.race([
+    new Promise((resolve) => {
+      child.once("exit", resolve);
+    }),
+    delay(2500),
+  ]);
+
+  if (!child.killed) {
+    child.kill("SIGKILL");
+  }
+}
+
 async function run() {
   const checks = [];
+  let managedServer = null;
   const push = (name, ok, details = "") => {
     checks.push({ name, ok, details });
     console.log(`[${ok ? "PASS" : "FAIL"}] ${name}${details ? ` - ${details}` : ""}`);
@@ -39,6 +106,15 @@ async function run() {
   let failed = false;
 
   try {
+    const healthyBeforeRun = await isServerHealthy();
+    if (!healthyBeforeRun) {
+      managedServer = startServerProcess();
+      await waitForHealthy();
+      push("Server bootstraps", true, "started by day2 smoke");
+    } else {
+      push("Server bootstraps", true, "using existing server");
+    }
+
     const health = await request("/");
     assert(health.response.ok, "Health endpoint failed");
     push("Health endpoint", true, `status=${health.response.status}`);
@@ -87,7 +163,8 @@ async function run() {
       assert(claim.response.ok, "Claim with valid token should succeed");
       assert(claim.json?.ok === true, "Claim should return ok=true");
       assert(
-        claim.json?.claimStatus === "claimed" || claim.json?.claimStatus === "already_owned_by_you",
+        claim.json?.claimStatus === CLAIM_ROOM_STATUS.CLAIMED ||
+          claim.json?.claimStatus === CLAIM_ROOM_STATUS.ALREADY_OWNED_BY_YOU,
         "Claim status should be claimed or already_owned_by_you",
       );
       push("Claim room ownership", true, `status=${claim.json.claimStatus}`);
@@ -134,6 +211,8 @@ async function run() {
   } catch (error) {
     failed = true;
     push("Day2 owner smoke", false, error instanceof Error ? error.message : "unknown error");
+  } finally {
+    await stopServerProcess(managedServer);
   }
 
   const passedCount = checks.filter((check) => check.ok).length;

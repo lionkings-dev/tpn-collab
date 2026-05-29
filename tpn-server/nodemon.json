@@ -1,0 +1,17 @@
+{
+  "watch": [
+    "server.js",
+    "auth",
+    "collab",
+    "db",
+    "rooms",
+    "routes",
+    "utils",
+    "../packages/contracts/src"
+  ],
+  "ext": "js,mjs,json",
+  "ignore": [
+    "node_modules"
+  ],
+  "exec": "node server.js"
+}

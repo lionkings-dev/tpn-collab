@@ -15,16 +15,16 @@ const ThemePanel: React.FC<ThemePanelProps> = ({
   };
 
   return (
-    <Panel position="top-right">
+    <Panel position="top-right" className="editor-theme ui-panel">
       <select
-        className="xy-theme__select"
+        className="ui-control xy-theme__select"
         onChange={onChange}
         value={colorMode}
         data-testid="colormode-select"
       >
-        <option value="dark">dark</option>
-        <option value="light">light</option>
-        <option value="system">system</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="system">System</option>
       </select>
     </Panel>
   );

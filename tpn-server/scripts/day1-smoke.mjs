@@ -1,3 +1,16 @@
+import { AUTH_ERROR_CODES, ROOM_ERROR_CODES } from "@tpn/contracts/error-codes";
+import { spawn } from "child_process";
+import { config as loadDotenv } from "dotenv";
+import { setTimeout as delay } from "timers/promises";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
+const scriptPath = fileURLToPath(import.meta.url);
+const scriptDir = dirname(scriptPath);
+const backendRoot = resolve(scriptDir, "..");
+
+loadDotenv({ path: resolve(backendRoot, ".env") });
+
 const baseUrl = (process.env.ROOM_API_URL || "http://localhost:1234").replace(/\/$/, "");
 const authToken = process.env.AUTH_BEARER_TOKEN || "";
 
@@ -29,8 +42,62 @@ function assert(condition, message) {
   }
 }
 
+async function isServerHealthy() {
+  try {
+    const response = await fetch(`${baseUrl}/`);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForHealthy(maxRetries = 40) {
+  for (let index = 0; index < maxRetries; index += 1) {
+    if (await isServerHealthy()) {
+      return;
+    }
+    await delay(250);
+  }
+
+  throw new Error("Server did not become healthy in time");
+}
+
+function startServerProcess() {
+  const child = spawn("node", ["server.js"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: process.env,
+    cwd: backendRoot,
+  });
+
+  child.stdout.on("data", (chunk) => {
+    process.stdout.write(`[server] ${chunk}`);
+  });
+  child.stderr.on("data", (chunk) => {
+    process.stderr.write(`[server] ${chunk}`);
+  });
+
+  return child;
+}
+
+async function stopServerProcess(child) {
+  if (!child || child.killed) return;
+
+  child.kill("SIGTERM");
+  await Promise.race([
+    new Promise((resolve) => {
+      child.once("exit", resolve);
+    }),
+    delay(2500),
+  ]);
+
+  if (!child.killed) {
+    child.kill("SIGKILL");
+  }
+}
+
 async function run() {
   const checks = [];
+  let managedServer = null;
 
   const pushResult = (name, ok, details = "") => {
     checks.push({ name, ok, details });
@@ -40,6 +107,15 @@ async function run() {
   };
 
   try {
+    const healthyBeforeRun = await isServerHealthy();
+    if (!healthyBeforeRun) {
+      managedServer = startServerProcess();
+      await waitForHealthy();
+      pushResult("Server bootstraps", true, "started by day1 smoke");
+    } else {
+      pushResult("Server bootstraps", true, "using existing server");
+    }
+
     const health = await request("/");
     assert(health.response.ok, "Server health endpoint failed");
     pushResult("Health endpoint", true, `status=${health.response.status}`);
@@ -47,14 +123,17 @@ async function run() {
     const unauthMe = await request("/api/me");
     assert(unauthMe.response.status === 401, "Expected /api/me to return 401 without token");
     assert(
-      unauthMe.json?.error === "missing_bearer_token",
-      "Expected missing_bearer_token error",
+      unauthMe.json?.error === AUTH_ERROR_CODES.MISSING_BEARER_TOKEN,
+      `Expected ${AUTH_ERROR_CODES.MISSING_BEARER_TOKEN} error`,
     );
-    pushResult("GET /api/me without token", true, "401 missing_bearer_token");
+    pushResult("GET /api/me without token", true, `401 ${AUTH_ERROR_CODES.MISSING_BEARER_TOKEN}`);
 
     const invalidRoom = await request("/api/rooms/BAD/exists");
     assert(invalidRoom.response.status === 400, "Expected invalid room id check to return 400");
-    assert(invalidRoom.json?.error === "invalid_room_id", "Expected invalid_room_id error");
+    assert(
+      invalidRoom.json?.error === ROOM_ERROR_CODES.INVALID_ROOM_ID,
+      `Expected ${ROOM_ERROR_CODES.INVALID_ROOM_ID} error`,
+    );
     pushResult("Room ID validation", true, "invalid room rejected");
 
     const anonRoomId = buildRoomId("qa-day1-anon");
@@ -135,6 +214,8 @@ async function run() {
       false,
       error instanceof Error ? error.message : "Unknown error",
     );
+  } finally {
+    await stopServerProcess(managedServer);
   }
 
   const passed = checks.filter((check) => check.ok).length;

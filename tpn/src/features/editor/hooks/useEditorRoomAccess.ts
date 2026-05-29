@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ROOM_ERROR_CODES } from "@tpn/contracts/error-codes";
 
 import { firebaseAuth } from "../../../lib/firebase";
 import {
@@ -135,7 +136,10 @@ export function useEditorRoomAccess({
         return "persisted" as const;
       } catch (error) {
         const code = error instanceof Error ? error.message : "";
-        if (code === "forbidden_room_owner_only" || code === "invalid_owner_id") {
+        if (
+          code === ROOM_ERROR_CODES.FORBIDDEN_ROOM_OWNER_ONLY ||
+          code === ROOM_ERROR_CODES.INVALID_OWNER_ID
+        ) {
           setRoomName(normalizedName);
           saveRoomNameLocally(activeRoomId, normalizedName);
           return "local_only" as const;

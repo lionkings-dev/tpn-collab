@@ -1,14 +1,16 @@
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Panel } from "@xyflow/react";
 import "./EditorHeader.css";
 import type { ToastType } from "./toastPopup";
+import type { ExportFormatOption, FormatId } from "../../features/export";
 
 type EditorHeaderProps = {
   roomId: string;
   roomName: string;
   onOpenSavePrompt: () => void;
   onNotify: (message: string, type?: ToastType) => void;
-  onExport: () => void;
+  exportFormats: ExportFormatOption[];
+  onExport: (formatId: FormatId) => void;
   onImportFile: (file: File) => void | Promise<void>;
   currentUserName: string | null;
   isAuthenticated: boolean;
@@ -22,6 +24,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   roomName,
   onOpenSavePrompt,
   onNotify,
+  exportFormats,
   onExport,
   onImportFile,
   currentUserName,
@@ -31,6 +34,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   onLogout,
 }) => {
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [exportSelection, setExportSelection] = useState<FormatId | "">("");
 
   const handleInvite = () => {
     const inviteLink = `${window.location.origin}/room/${roomId}`;
@@ -77,23 +81,53 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
       if (!file) return;
 
       void Promise.resolve(onImportFile(file)).catch(() => {
-        onNotify("Import failed. Please check your PNML file.", "error");
+        onNotify("Import failed. Please check your file format.", "error");
       });
     },
     [onImportFile, onNotify],
   );
 
+  const handleExportSelection = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const formatId = event.target.value as FormatId | "";
+      setExportSelection(formatId);
+      if (!formatId) return;
+
+      onExport(formatId);
+      setExportSelection("");
+    },
+    [onExport],
+  );
+
   return (
-    <Panel position="top-left" className="editor-header">
+    <Panel position="top-left" className="editor-header ui-panel">
       <span className="room-name">{roomName}</span>
-      <button onClick={handleInvite}>Invite</button>
-      <button onClick={onOpenSavePrompt}>Rename Room</button>
-      <button onClick={onExport}>Export</button>
-      <button onClick={handleImportClick}>Import</button>
+      <button className="ui-button ui-button-secondary" onClick={handleInvite}>
+        Invite
+      </button>
+      <button className="ui-button ui-button-secondary" onClick={onOpenSavePrompt}>
+        Rename Room
+      </button>
+      <select
+        className="editor-format-select ui-control"
+        value={exportSelection}
+        onChange={handleExportSelection}
+        aria-label="Export graph format"
+      >
+        <option value="">Export...</option>
+        {exportFormats.map((format) => (
+          <option key={format.id} value={format.id}>
+            {format.label}
+          </option>
+        ))}
+      </select>
+      <button className="ui-button ui-button-secondary" onClick={handleImportClick}>
+        Import
+      </button>
       <input
         ref={importInputRef}
         type="file"
-        accept=".pnml,.xml,application/xml,text/xml"
+        accept=".pnml,.xml,.ppp,.spec,.txt,application/xml,text/xml,text/plain"
         style={{ display: "none" }}
         onChange={handleImportFileChange}
       />
@@ -102,12 +136,12 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
           <span className="editor-auth-name" title={currentUserName || "Authenticated User"}>
             {currentUserName || "Authenticated User"}
           </span>
-          <button onClick={onLogout} disabled={isAuthLoading}>
+          <button className="ui-button ui-button-ghost" onClick={onLogout} disabled={isAuthLoading}>
             {isAuthLoading ? "Signing out..." : "Sign Out"}
           </button>
         </>
       ) : (
-        <button onClick={onLogin} disabled={isAuthLoading}>
+        <button className="ui-button ui-button-primary" onClick={onLogin} disabled={isAuthLoading}>
           {isAuthLoading ? "Signing in..." : "Log in with Google"}
         </button>
       )}

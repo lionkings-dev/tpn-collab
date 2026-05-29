@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ROOM_ERROR_CODES } from "@tpn/contracts/error-codes";
 import "./LandingPage.css";
 import ToastPopup, { type ToastType } from "../components/panels/toastPopup";
 import { useAuth } from "../auth/AuthContext";
@@ -20,11 +21,14 @@ type ToastState = {
   type: ToastType;
 };
 
+const CREATE_ROOM_MAX_ATTEMPTS = 5;
+
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const routeJoinError =
     (location.state as { joinError?: string } | null)?.joinError || "";
+  const consumedRouteJoinErrorRef = useRef<string | null>(null);
   const [joinInput, setJoinInput] = useState("");
   const [joinError, setJoinError] = useState(routeJoinError);
   const [isJoining, setIsJoining] = useState(false);
@@ -54,14 +58,23 @@ const LandingPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!routeJoinError) return;
+    if (!routeJoinError) {
+      consumedRouteJoinErrorRef.current = null;
+      return;
+    }
+
+    if (consumedRouteJoinErrorRef.current === routeJoinError) {
+      return;
+    }
+
+    consumedRouteJoinErrorRef.current = routeJoinError;
+    setJoinError(routeJoinError);
     showToast(routeJoinError, "error");
-  }, [routeJoinError]);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [routeJoinError, navigate, location.pathname]);
 
   const handleCreateModel = async () => {
     setIsCreating(true);
-    const roomId = generateRoomId();
-    const roomName = generateRoomName(roomId);
 
     try {
       let idToken: string | undefined;
@@ -69,30 +82,49 @@ const LandingPage: React.FC = () => {
         idToken = await user.getIdToken();
       }
 
-      const createdRoom = await registerRoom(roomId, {
-        idToken,
-        name: roomName,
-      });
+      for (let attempt = 1; attempt <= CREATE_ROOM_MAX_ATTEMPTS; attempt += 1) {
+        const roomId = generateRoomId();
+        const roomName = generateRoomName(roomId);
 
-      if (createdRoom.claimToken) {
-        saveRoomClaimToken(roomId, createdRoom.claimToken);
+        try {
+          const createdRoom = await registerRoom(roomId, {
+            idToken,
+            name: roomName,
+          });
+          const createdRoomId = createdRoom.roomId;
+
+          if (createdRoom.claimToken) {
+            saveRoomClaimToken(createdRoomId, createdRoom.claimToken);
+          } else {
+            clearRoomClaimToken(createdRoomId);
+          }
+
+          navigate(`/room/${createdRoomId}`, {
+            state: {
+              roomName,
+            },
+          });
+          return;
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message === ROOM_ERROR_CODES.ROOM_ID_COLLISION &&
+            attempt < CREATE_ROOM_MAX_ATTEMPTS
+          ) {
+            continue;
+          }
+
+          throw error;
+        }
       }
 
-      if (!createdRoom.claimToken) {
-        clearRoomClaimToken(roomId);
-      }
-
-      navigate(`/room/${roomId}`, {
-        state: {
-          roomName,
-        },
-      });
+      const collisionMessage = "Could not allocate a unique room ID. Please try again.";
+      setJoinError(collisionMessage);
+      showToast(collisionMessage, "error");
     } catch {
       const message = "Could not create room right now. Please try again.";
       setJoinError(message);
       showToast(message, "error");
-      setIsCreating(false);
-      return;
     } finally {
       setIsCreating(false);
     }
@@ -191,16 +223,16 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="landing-container">
-      <header className="landing-header">
-        <div className="logo">TPN-Collab</div>
-        <nav className="main-nav">
+      <header className="landing-header ui-page-shell">
+        <div className="logo">TPN Collab</div>
+        <nav className="main-nav" aria-label="Account actions">
           {isAuthenticated ? (
             <>
               <span className="nav-user-name" title={authName}>
                 {authName}
               </span>
               <button
-                className="nav-button"
+                className="ui-button ui-button-secondary"
                 onClick={() => {
                   navigate("/rooms");
                 }}
@@ -208,7 +240,7 @@ const LandingPage: React.FC = () => {
                 My Rooms
               </button>
               <button
-                className="nav-button"
+                className="ui-button ui-button-ghost"
                 onClick={() => {
                   void handleSignOut();
                 }}
@@ -219,7 +251,7 @@ const LandingPage: React.FC = () => {
             </>
           ) : (
             <button
-              className="nav-button signup"
+              className="ui-button ui-button-primary"
               onClick={() => {
                 void handleSignIn();
               }}
@@ -232,7 +264,8 @@ const LandingPage: React.FC = () => {
       </header>
 
       <main className="landing-main">
-        <div className="landing-box">
+        <div className="landing-box ui-card">
+          <span className="landing-chip">Collaborative modeling</span>
           <h1 className="landing-title">
             Timed Petri Net Collaborative Editor
           </h1>
@@ -241,7 +274,7 @@ const LandingPage: React.FC = () => {
             instantly.
           </p>
           <button
-            className="landing-button"
+            className="ui-button ui-button-primary landing-button"
             onClick={() => {
               void handleCreateModel();
             }}
@@ -256,13 +289,13 @@ const LandingPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="Enter Room ID..."
-                className={`room-id-input ${joinError ? "input-error" : ""}`}
+                className={`ui-control room-id-input ${joinError ? "is-invalid" : ""}`}
                 value={joinInput}
                 onChange={handleJoinInputChange}
                 onKeyDown={handleJoinKeyDown}
               />
               <button
-                className="join-button"
+                className="ui-button ui-button-secondary join-button"
                 onClick={() => {
                   void handleJoinRoom();
                 }}

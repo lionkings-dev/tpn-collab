@@ -78,7 +78,7 @@ export default function InputPrompt({
         {description && <p className="input-prompt-description">{description}</p>}
         <input
           ref={inputRef}
-          className={`input-prompt-input ${error ? "is-invalid" : ""}`}
+          className={`input-prompt-input ui-control ${error ? "is-invalid" : ""}`}
           placeholder={placeholder}
           value={value}
           onChange={(event) => {
@@ -89,10 +89,10 @@ export default function InputPrompt({
         />
         {error && <p className="input-prompt-error">{error}</p>}
         <div className="input-prompt-actions">
-          <button type="button" className="input-prompt-btn ghost" onClick={onCancel}>
+          <button type="button" className="ui-button ui-button-secondary input-prompt-btn" onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button type="button" className="input-prompt-btn" onClick={handleConfirm}>
+          <button type="button" className="ui-button ui-button-primary input-prompt-btn" onClick={handleConfirm}>
             {confirmLabel}
           </button>
         </div>

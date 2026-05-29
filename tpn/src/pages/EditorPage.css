@@ -1,0 +1,70 @@
+.editor-page {
+  background: var(--bg-color);
+}
+
+.editor-actions {
+  padding: var(--space-2);
+}
+
+.add-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.editor-theme {
+  min-width: 130px;
+}
+
+.editor-theme .ui-control {
+  width: 100%;
+}
+
+.editor-page .react-flow__controls {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-color) 94%, transparent);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.editor-page .react-flow__controls-button {
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--fg-color);
+}
+
+.editor-page .react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+.editor-page .react-flow__controls-button:hover {
+  background: var(--surface-muted);
+}
+
+.editor-page .react-flow__attribution {
+  background: color-mix(in srgb, var(--surface-color) 95%, transparent);
+  color: var(--fg-alt-color);
+  border-top-left-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  border-right: none;
+  border-bottom: none;
+}
+
+@media (max-width: 900px) {
+  .add-button {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .editor-header {
+    max-width: calc(100vw - 24px);
+  }
+
+  .editor-header .room-name,
+  .editor-header .editor-auth-name {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}

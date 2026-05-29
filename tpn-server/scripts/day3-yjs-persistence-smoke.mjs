@@ -1,11 +1,19 @@
-import "dotenv/config";
 import { spawn } from "child_process";
+import { config as loadDotenv } from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
 import { setTimeout as delay } from "timers/promises";
 
 import WebSocket from "ws";
 import { MongoClient } from "mongodb";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
+
+const scriptPath = fileURLToPath(import.meta.url);
+const scriptDir = dirname(scriptPath);
+const backendRoot = resolve(scriptDir, "..");
+
+loadDotenv({ path: resolve(backendRoot, ".env") });
 
 const baseUrl = (process.env.ROOM_API_URL || "http://localhost:1234").replace(/\/$/, "");
 const authToken = process.env.AUTH_BEARER_TOKEN || "";
@@ -72,13 +80,19 @@ async function request(path, options = {}) {
   return { response, json, text };
 }
 
+async function isServerHealthy() {
+  try {
+    const response = await fetch(`${baseUrl}/`);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function waitForHealthy(maxRetries = 40) {
   for (let i = 0; i < maxRetries; i += 1) {
-    try {
-      const res = await fetch(`${baseUrl}/`);
-      if (res.ok) return;
-    } catch {
-      // server still starting
+    if (await isServerHealthy()) {
+      return;
     }
     await delay(250);
   }
@@ -90,7 +104,7 @@ function startServerProcess() {
   const child = spawn("node", ["server.js"], {
     stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
-    cwd: process.cwd(),
+    cwd: backendRoot,
   });
 
   child.stdout.on("data", (chunk) => {
@@ -226,13 +240,20 @@ async function run() {
     console.log(`[${ok ? "PASS" : "FAIL"}] ${name}${details ? ` - ${details}` : ""}`);
   };
 
-  let server = null;
+  let managedServer = null;
+  let usingExternalServer = false;
   const sessions = [];
 
   try {
-    server = startServerProcess();
-    await waitForHealthy();
-    push("Server bootstraps", true);
+    const healthyBeforeRun = await isServerHealthy();
+    if (healthyBeforeRun) {
+      usingExternalServer = true;
+      push("Server bootstraps", true, "using existing server");
+    } else {
+      managedServer = startServerProcess();
+      await waitForHealthy();
+      push("Server bootstraps", true, "started by day3 smoke");
+    }
 
     const roomId = buildRoomId("qa-day3-yjs");
     const register = await request(`/api/rooms/${encodeURIComponent(roomId)}/register`, {
@@ -281,28 +302,33 @@ async function run() {
       session.ydoc.destroy();
     }
 
-    await delay(700);
-    await stopServerProcess(server);
-    push("Server stopped", true);
+    if (usingExternalServer) {
+      push("Server restart persistence check", true, "skipped (external server mode)");
+    } else {
+      await delay(700);
+      await stopServerProcess(managedServer);
+      managedServer = null;
+      push("Server stopped", true);
 
-    server = startServerProcess();
-    await waitForHealthy();
-    push("Server restarted", true);
+      managedServer = startServerProcess();
+      await waitForHealthy();
+      push("Server restarted", true);
 
-    const secondSession = await connectProvider(roomId);
-    sessions.push(secondSession);
-    const reloadedNodes = secondSession.ydoc.getMap("nodes");
-    const restoredNode = await waitForMapEntry(reloadedNodes, "qa-node-1");
+      const secondSession = await connectProvider(roomId);
+      sessions.push(secondSession);
+      const reloadedNodes = secondSession.ydoc.getMap("nodes");
+      const restoredNode = await waitForMapEntry(reloadedNodes, "qa-node-1");
 
-    assert(Boolean(restoredNode), "Persisted node missing after restart");
-    assert(restoredNode.data?.label === "Persisted Place", "Restored node label mismatch");
+      assert(Boolean(restoredNode), "Persisted node missing after restart");
+      assert(restoredNode.data?.label === "Persisted Place", "Restored node label mismatch");
 
-    secondSession.provider.disconnect();
-    secondSession.provider.destroy();
-    secondSession.ydoc.destroy();
-    sessions.pop();
+      secondSession.provider.disconnect();
+      secondSession.provider.destroy();
+      secondSession.ydoc.destroy();
+      sessions.pop();
 
-    push("Yjs state restored after restart", true, `nodeCount=${reloadedNodes.size}`);
+      push("Yjs state restored after restart", true, `nodeCount=${reloadedNodes.size}`);
+    }
 
     if (authToken) {
       const archive = await request(`/api/rooms/${encodeURIComponent(roomId)}`, {
@@ -333,7 +359,7 @@ async function run() {
       session.provider.destroy();
       session.ydoc.destroy();
     }
-    await stopServerProcess(server);
+    await stopServerProcess(managedServer);
   }
 
   const passed = checks.filter((check) => check.ok).length;

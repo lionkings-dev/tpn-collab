@@ -2,16 +2,37 @@
   "name": "tpn-collab-repo",
   "private": true,
   "version": "1.0.0",
+  "workspaces": [
+    "tpn",
+    "tpn-server",
+    "packages/*"
+  ],
   "scripts": {
-    "install:frontend": "npm --prefix tpn install",
-    "install:backend": "npm --prefix tpn-server install",
-    "install:all": "npm run install:frontend && npm run install:backend",
-    "dev:frontend": "npm --prefix tpn run dev",
-    "dev:backend": "npm --prefix tpn-server run dev",
+    "install:frontend": "npm install --workspace tpn",
+    "install:backend": "npm install --workspace tpn-server",
+    "install:all": "npm install",
+    "dev:frontend": "npm run dev --workspace tpn",
+    "dev:backend": "npm run dev --workspace tpn-server",
     "dev": "bash -c 'npm run dev:backend & npm run dev:frontend & wait'",
-    "build:frontend": "npm --prefix tpn run build",
-    "test:frontend": "npm --prefix tpn run test:unit",
-    "test:backend": "npm --prefix tpn-server run test:day1 && npm --prefix tpn-server run test:day2 && npm --prefix tpn-server run test:day3",
+    "start:backend": "npm run start --workspace tpn-server",
+    "build": "npm run build:frontend",
+    "report:docx": "node tools/generate-tpn-report-docx.mjs",
+    "build:frontend": "npm run build --workspace tpn",
+    "typecheck": "npm run typecheck:frontend",
+    "typecheck:frontend": "npm run typecheck --workspace tpn",
+    "lint": "npm run lint:frontend && npm run lint:backend && npm run lint:contracts",
+    "lint:frontend": "npm run lint --workspace tpn",
+    "lint:backend": "npm run lint --workspace tpn-server --if-present",
+    "lint:contracts": "npm run lint --workspace @tpn/contracts --if-present",
+    "test:frontend": "npm run test:unit --workspace tpn",
+    "test:backend:unit": "npm run test:unit --workspace tpn-server",
+    "test:backend": "npm run test:day1 --workspace tpn-server && npm run test:day2 --workspace tpn-server && npm run test:day3 --workspace tpn-server",
+    "test:contracts": "npm run test --workspace @tpn/contracts --if-present",
+    "test:unit": "npm run test:frontend && npm run test:backend:unit",
     "test": "npm run test:frontend && npm run test:backend"
+  },
+  "devDependencies": {
+    "docx": "^9.6.1",
+    "marked": "^18.0.3"
   }
 }
