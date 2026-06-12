@@ -27,25 +27,6 @@ synchronization powered by Yjs (CRDT).
 | Shared | `@tpn/contracts` workspace package |
 | Deploy | Vercel (frontend) · Railway (backend) |
 
-## Architecture
-
-repo root/
-├── tpn/                  # Frontend — React + TypeScript + Vite
-│   └── src/
-│       ├── auth/         # Firebase auth hooks and context
-│       ├── components/   # Shared UI components
-│       ├── features/     # Feature modules (editor, rooms, …)
-│       ├── hooks/        # Custom React hooks
-│       └── pages/        # Route-level components
-├── tpn-server/           # Backend — Node.js + Express + Yjs
-│   ├── auth/             # Firebase Admin token verification
-│   ├── collab/           # Yjs WebSocket handling
-│   ├── db/               # MongoDB connection and queries
-│   ├── rooms/            # Room lifecycle management
-│   └── routes/           # REST API route handlers
-├── packages/contracts/   # Shared room-ID contract (frontend + backend)
-├── vercel.json           # Frontend deploy config
-└── railway.json          # Backend deploy config
 
 **How real-time sync works:** clients apply edits locally and broadcast Yjs
 updates through y-websocket. CRDT operations are commutative, so updates merge
