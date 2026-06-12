@@ -1,102 +1,30 @@
-# TPN Collaboration Workspace Monorepo
+# TPN Collab — Web-Based Collaborative Time Petri Net Editor
 
-This repository contains the full TPN collaboration stack:
+A real-time collaborative editor for Time Petri Net diagrams. Multiple users can
+create and edit diagrams simultaneously in the browser, with conflict-free
+synchronization powered by Yjs (CRDT).
 
-- `tpn/`: React + TypeScript + Vite frontend
-- `tpn-server/`: Node.js + Express + MongoDB + Yjs backend
-- `packages/`: shared workspace packages (contracts/utilities)
+**🔗 Live demo:** [tpn-collab.vercel.app](https://tpn-collab.vercel.app)
 
-## Repository Layout
+> Built solo as my Computer Science graduation project at Thammasat University (2026).
 
-- `tpn/`
-  - User-facing editor UI, room flows, PNML import/export, auth client integration
-- `tpn-server/`
-  - Room APIs, auth verification, room lifecycle, WebSocket admission, Yjs persistence
+## Features
 
-## Quick Start
+- ⚡ Real-time collaborative editing with Yjs CRDT — no conflicts, no locking
+- 📄 PNML (Petri Net Markup Language) import/export
+- 🔐 Google Sign-In via Firebase Authentication
+- 🚪 Room system — share a room code to invite collaborators
+- 🎨 Interactive canvas for places, transitions, arcs, tokens, and time intervals
 
-1. Install all dependencies:
+## Tech Stack
 
-```bash
-npm install
-```
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, TypeScript, Vite, React Flow |
+| Backend | Node.js, Express, Yjs WebSocket provider (y-websocket) |
+| Database | MongoDB (persists Yjs updates) |
+| Auth | Firebase Authentication (Google Sign-In) |
+| Shared | `@tpn/contracts` workspace package |
+| Deploy | Vercel (frontend) · Railway (backend) |
 
-Optional compatibility command:
-
-```bash
-npm run install:all
-```
-
-2. Configure environment variables:
-
-- Frontend: copy `tpn/.env.example` to `tpn/.env.local`
-- Backend: copy `tpn-server/.env.example` to `tpn-server/.env`
-- See `ENVIRONMENT.md` for full variable reference and deployment mapping
-
-3. Run both apps in development:
-
-```bash
-npm run dev
-```
-
-If you prefer separate terminals:
-
-```bash
-npm run dev:backend
-npm run dev:frontend
-```
-
-## Root Scripts
-
-- `npm install` or `npm run install:all`: install workspace dependencies
-- `npm run dev`: run backend + frontend together (Linux/macOS shell)
-- `npm run dev:backend`: run backend only
-- `npm run dev:frontend`: run frontend only
-- `npm run start:backend`: start backend in production mode
-- `npm run build`: build workspace apps (currently frontend)
-- `npm run build:frontend`: build frontend app
-- `npm run typecheck`: run workspace type checks
-- `npm run lint`: run workspace lint checks (frontend + optional package scripts)
-- `npm run test:frontend`: run frontend unit tests
-- `npm run test:backend`: run backend day1/day2/day3 smoke scripts
-- `npm run test`: run frontend + backend test suites
-
-## Workspace Rules
-
-- Use the root `package-lock.json` as the single lockfile.
-- Run installs from repo root (`npm install`).
-- Backend dev watcher includes `packages/contracts/src` changes via `tpn-server/nodemon.json`.
-
-## Architecture Notes
-
-- Frontend talks to backend REST at `VITE_ROOM_API_URL`.
-- Frontend connects to Yjs WebSocket at `VITE_WS_URL`.
-- Backend validates room admission before WebSocket upgrade.
-- Backend persists collaborative Yjs updates to MongoDB.
-- Room metadata exposure policy:
-  - public room endpoint: name-only
-  - private room endpoint: owner-only metadata
-
-## Deployment
-
-- Frontend deploy config: `vercel.json` at repo root
-- Frontend Vercel build output: `tpn/dist`
-- Backend deploy config: `railway.json`
-- Keep frontend API/WS URLs aligned with backend deployment URL.
-- Set backend `CORS_ORIGIN` to the deployed frontend origin.
-
-### Railway (root workspace scope)
-
-- Root directory: repository root
-- Build command: `npm install`
-- Start command: `npm run start:backend`
-- Watch paths:
-  - `tpn-server/**`
-  - `packages/contracts/**`
-  - `package.json`
-  - `package-lock.json`
-
-## App-Level Docs
-
-- Frontend app docs: `tpn/README.md`
-- Frontend room flow notes: `tpn/QA_TODAY_ROOM_FLOW.md`
+## Architecture
